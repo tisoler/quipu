@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 import { TipoMovimiento, TipoArticulo, EstadoMovimiento } from '../types'
 import MovimientoModal from '../components/MovimientoModal'
+import DataTable, { Column } from '../components/DataTable'
+import clsx from 'clsx'
 
 interface Movimiento {
   id: number
@@ -18,18 +21,7 @@ interface Movimiento {
   usuario?: { id: number; nombreUsuario: string }
   estado: EstadoMovimiento
   descripcion?: string
-}
-
-interface Producto {
-  id: number
-  nombre: string
-  precio: number
-}
-
-interface Material {
-  id: number
-  nombre: string
-  precio: number
+  articulo?: { id: number; nombre: string }
 }
 
 interface Almacen {
@@ -49,13 +41,25 @@ const RANGOS_DIAS: { value: RangoDias; label: string }[] = [
   { value: 'all', label: 'Todos' },
 ]
 
-export default function Movimientos() {
+interface MovimientosProps {
+  fixedTipoArticulo?: TipoArticulo | ''
+  fixedTipoMovimiento?: TipoMovimiento | ''
+  title?: string
+  addPermission?: string
+}
+
+export default function Movimientos({
+  fixedTipoArticulo = '',
+  fixedTipoMovimiento = '',
+  title = 'Movimientos',
+  addPermission = 'escritura:movimiento'
+}: MovimientosProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [rangoDias, setRangoDias] = useState<RangoDias>('30')
   const [filtros, setFiltros] = useState({
-    tipoArticulo: '' as TipoArticulo | '',
-    tipoMovimiento: '' as TipoMovimiento | '',
+    tipoArticulo: fixedTipoArticulo,
+    tipoMovimiento: fixedTipoMovimiento,
     estado: '' as EstadoMovimiento | '',
     idAlmacen: '',
     search: '',
@@ -96,13 +100,13 @@ export default function Movimientos() {
     }
     if (fechaDesde) params.fechaDesde = fechaDesde
     if (fechaHasta) params.fechaHasta = fechaHasta
-    if (filtros.tipoArticulo) params.tipoArticulo = filtros.tipoArticulo
-    if (filtros.tipoMovimiento) params.tipoMovimiento = filtros.tipoMovimiento
+    if (fixedTipoArticulo || filtros.tipoArticulo) params.tipoArticulo = fixedTipoArticulo || filtros.tipoArticulo
+    if (fixedTipoMovimiento || filtros.tipoMovimiento) params.tipoMovimiento = fixedTipoMovimiento || filtros.tipoMovimiento
     if (filtros.estado) params.estado = filtros.estado
     if (filtros.idAlmacen) params.idAlmacen = filtros.idAlmacen
     if (filtros.search) params.search = filtros.search
     return params
-  }, [page, fechaDesde, fechaHasta, filtros])
+  }, [page, fechaDesde, fechaHasta, filtros, fixedTipoArticulo, fixedTipoMovimiento])
 
   const { data, isLoading } = useQuery<{
     data: Movimiento[]
@@ -111,25 +115,9 @@ export default function Movimientos() {
     limit: number
     totalPages: number
   }>({
-    queryKey: ['movimientos', queryParams],
+    queryKey: ['movimientos', fixedTipoArticulo || '', fixedTipoMovimiento || '', queryParams],
     queryFn: async () => {
       const response = await api.get('/movimientos', { params: queryParams })
-      return response.data
-    },
-  })
-
-  const { data: productos = [] } = useQuery<Producto[]>({
-    queryKey: ['productos'],
-    queryFn: async () => {
-      const response = await api.get('/productos')
-      return response.data
-    },
-  })
-
-  const { data: materiales = [] } = useQuery<Material[]>({
-    queryKey: ['materiales'],
-    queryFn: async () => {
-      const response = await api.get('/materiales')
       return response.data
     },
   })
@@ -141,6 +129,9 @@ export default function Movimientos() {
       return response.data
     },
   })
+
+  const { permisos = [] } = useAuth()
+  const canAdd = permisos.includes(addPermission)
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -169,316 +160,191 @@ export default function Movimientos() {
     }
   }
 
-  if (isLoading) {
-    return <div className="text-center py-8">Cargando...</div>
-  }
+  const columns = useMemo<Column<Movimiento>[]>(() => [
+    { header: 'Fecha', key: 'fecha', type: 'date', className: 'font-medium' },
+    {
+      header: 'Tipo',
+      key: 'tipoMovimiento',
+      render: (m: Movimiento) => (
+        <span className={clsx(
+          "px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-tighter",
+          m.tipoMovimiento === TipoMovimiento.VENTA
+            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+            : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+        )}>
+          {m.tipoMovimiento}
+        </span>
+      ),
+      className: 'text-center',
+    },
+    { header: 'Artículo', key: 'articulo', render: (m: Movimiento) => m.articulo?.nombre || '-' },
+    { header: 'Cantidad', key: 'cantidad', type: 'number', className: 'text-center' },
+    { header: 'Precio', key: 'precio', type: 'currency' },
+    { header: 'Total', key: 'total', type: 'currency' },
+    { header: 'Almacén', key: 'almacen', render: (m: Movimiento) => m.almacen?.nombre || '-' },
+    {
+      header: 'Estado',
+      key: 'estado',
+      render: (m: Movimiento) => (
+        <span className={clsx(
+          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+          m.estado === EstadoMovimiento.ACTIVO
+            ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+            : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+        )}>
+          {m.estado}
+        </span>
+      ),
+      className: 'text-center',
+    },
+  ], [])
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Movimientos</h1>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Agregar Movimiento
-        </button>
+    <div className="flex flex-col gap-6">
+      <div className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/40 p-4 mb-2 rounded-2xl md:bg-transparent md:p-0">
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{title}</h1>
+        {canAdd && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="group px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center gap-2"
+          >
+            <span className="bg-white/20 p-1 rounded-lg group-hover:scale-110 transition-transform">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+            </span>
+            Agregar {fixedTipoMovimiento ? fixedTipoMovimiento.charAt(0).toUpperCase() + fixedTipoMovimiento.slice(1) : 'Movimiento'}
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 space-y-6 ring-1 ring-black/[0.03] dark:ring-white/[0.03]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Rango de días */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Rango
-            </label>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Rango rápido</label>
             <select
               value={rangoDias}
               onChange={(e) => handleRangoChange(e.target.value as RangoDias)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm font-medium text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 outline-none transition-all cursor-pointer"
             >
               {RANGOS_DIAS.map((rango) => (
-                <option key={rango.value} value={rango.value}>
-                  {rango.label}
-                </option>
+                <option key={rango.value} value={rango.value}>{rango.label}</option>
               ))}
             </select>
           </div>
 
-          {/* Tipo Artículo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Tipo Artículo
-            </label>
-            <select
-              value={filtros.tipoArticulo}
-              onChange={(e) => handleFiltroChange('tipoArticulo', e.target.value || '')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="">Todos</option>
-              <option value={TipoArticulo.PRODUCTO}>Producto</option>
-              <option value={TipoArticulo.MATERIAL}>Material</option>
-            </select>
-          </div>
+          {!fixedTipoArticulo && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Categoría</label>
+              <select
+                value={filtros.tipoArticulo}
+                onChange={(e) => handleFiltroChange('tipoArticulo', e.target.value || '')}
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm font-medium"
+              >
+                <option value="">Todos</option>
+                <option value={TipoArticulo.PRODUCTO}>Producto</option>
+                <option value={TipoArticulo.MATERIAL}>Material</option>
+              </select>
+            </div>
+          )}
 
-          {/* Tipo Movimiento */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Tipo Movimiento
-            </label>
-            <select
-              value={filtros.tipoMovimiento}
-              onChange={(e) => handleFiltroChange('tipoMovimiento', e.target.value || '')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="">Todos</option>
-              <option value={TipoMovimiento.VENTA}>Venta</option>
-              <option value={TipoMovimiento.COMPRA}>Compra</option>
-            </select>
-          </div>
+          {!fixedTipoMovimiento && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Tipo Movimiento</label>
+              <select
+                value={filtros.tipoMovimiento}
+                onChange={(e) => handleFiltroChange('tipoMovimiento', e.target.value || '')}
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm font-medium"
+              >
+                <option value="">Todos</option>
+                <option value={TipoMovimiento.VENTA}>Venta</option>
+                <option value={TipoMovimiento.COMPRA}>Compra</option>
+                <option value={TipoMovimiento.CONSUMO}>Consumo</option>
+                <option value={TipoMovimiento.PRODUCCION}>Producción</option>
+                <option value={TipoMovimiento.TRANSFERENCIA}>Transferencia</option>
+              </select>
+            </div>
+          )}
 
-          {/* Estado */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Estado
-            </label>
-            <select
-              value={filtros.estado}
-              onChange={(e) => handleFiltroChange('estado', e.target.value || '')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="">Todos</option>
-              <option value={EstadoMovimiento.ACTIVO}>Activo</option>
-              <option value={EstadoMovimiento.ELIMINADO}>Eliminado</option>
-            </select>
-          </div>
-
-          {/* Almacén */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Almacén
-            </label>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Almacén</label>
             <select
               value={filtros.idAlmacen}
               onChange={(e) => handleFiltroChange('idAlmacen', e.target.value || '')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm font-medium"
             >
               <option value="">Todos</option>
               {almacenes.map((almacen) => (
-                <option key={almacen.id} value={almacen.id}>
-                  {almacen.nombre}
-                </option>
+                <option key={almacen.id} value={almacen.id}>{almacen.nombre}</option>
               ))}
             </select>
           </div>
+        </div>
 
-          {/* Fechas personalizadas */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Fecha Desde
-            </label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-100 dark:border-gray-700/50">
+          <div className="md:col-span-1 space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Desde</label>
             <input
               type="date"
               value={filtros.fechaDesde}
               onChange={(e) => handleFiltroChange('fechaDesde', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm"
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Fecha Hasta
-            </label>
+          <div className="md:col-span-1 space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Hasta</label>
             <input
               type="date"
               value={filtros.fechaHasta}
               onChange={(e) => handleFiltroChange('fechaHasta', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm"
             />
           </div>
-
-          {/* Búsqueda */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Búsqueda
-            </label>
+          <div className="md:col-span-1 space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Búsqueda rápida</label>
             <input
               type="text"
               placeholder="Descripción o artículo..."
               value={searchDebounce}
               onChange={(e) => setSearchDebounce(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-gray-400"
             />
           </div>
         </div>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Artículo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Cantidad
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Precio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Almacén
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {data?.data.map((movimiento) => (
-                <tr key={movimiento.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(movimiento.fecha).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        movimiento.tipoMovimiento === TipoMovimiento.VENTA
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      }`}
-                    >
-                      {movimiento.tipoMovimiento}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {movimiento.tipoArticulo === 'producto' ? productos?.find(p => p.id === movimiento.idArticulo)?.nombre : materiales?.find(m => m.id === movimiento.idArticulo)?.nombre}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {movimiento.cantidad}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    ${movimiento.precio}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    ${movimiento.total}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {movimiento.almacen?.nombre || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        movimiento.estado === EstadoMovimiento.ACTIVO
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}
-                    >
-                      {movimiento.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {movimiento.estado === EstadoMovimiento.ACTIVO && (
-                      <button
-                        onClick={() => handleDelete(movimiento.id)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginación */}
-        {data && data.totalPages > 1 && (
-          <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                disabled={page === data.totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Mostrando <span className="font-medium">{(page - 1) * 10 + 1}</span> a{' '}
-                  <span className="font-medium">{Math.min(page * 10, data.total)}</span> de{' '}
-                  <span className="font-medium">{data.total}</span> resultados
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-                  {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => setPage(num)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        page === num
-                          ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-300'
-                          : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                    disabled={page === data.totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-                  >
-                    Siguiente
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
+      <DataTable
+        isLoading={isLoading}
+        data={data?.data || []}
+        columns={columns}
+        pagination={data ? {
+          currentPage: data.page,
+          totalPages: data.totalPages,
+          onPageChange: (p) => setPage(p),
+          totalItems: data.total
+        } : undefined}
+        renderActions={(m: Movimiento) => (
+          m.estado === EstadoMovimiento.ACTIVO && (
+            <button
+              onClick={() => handleDelete(m.id)}
+              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors group"
+              title="Eliminar movimiento"
+            >
+              <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )
         )}
-      </div>
+      />
 
       {isModalOpen && (
         <MovimientoModal
           onClose={() => setIsModalOpen(false)}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['movimientos'] })
-          }}
+          fixedTipoArticulo={fixedTipoArticulo}
+          fixedTipoMovimiento={fixedTipoMovimiento}
         />
       )}
     </div>
   )
-};
+}

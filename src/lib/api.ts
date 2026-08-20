@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
+import { auth } from './firebase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3062/api'
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -9,12 +9,39 @@ export const api = axios.create({
   },
 })
 
+// Función auxiliar para esperar a que Firebase inicialice o devuelva el token actual
+const getAuthToken = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    // Si ya existe el usuario cargado en memoria, obtenemos el token
+    if (auth.currentUser) {
+      resolve(auth.currentUser.getIdToken());
+      return;
+    }
+
+    // Si no, escuchamos el cambio de estado una sola vez para capturar la inicialización
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      unsubscribe();
+      if (user) {
+        resolve(user.getIdToken());
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 // Interceptor para agregar el token a las peticiones
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+  async (config) => {
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      } else {
+        console.log('⚠️ No hay usuario logueado o token disponible para:', config.url);
+      }
+    } catch (error) {
+      console.error('Error al obtener token de Firebase:', error);
     }
     return config
   },
@@ -23,40 +50,14 @@ api.interceptors.request.use(
   }
 )
 
-// Interceptor para manejar errores y refresh token
+// Interceptor simple, Firebase manejara la expiracion del token
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as any
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (!refreshToken) {
-          throw new Error('No refresh token')
-        }
-
-        const response = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        })
-
-        const { accessToken, refreshToken: newRefreshToken } = response.data
-
-        localStorage.setItem('accessToken', accessToken)
-        localStorage.setItem('refreshToken', newRefreshToken)
-
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`
-        return api(originalRequest)
-      } catch (refreshError) {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
-      }
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      // Opcionalmente redirigir
+      // window.location.href = '/login'
     }
-
     return Promise.reject(error)
   }
 )

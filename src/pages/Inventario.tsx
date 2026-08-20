@@ -5,6 +5,8 @@ import api from '../lib/api'
 import { TipoArticulo } from '../types'
 import MovimientoModal from '../components/MovimientoModal'
 import { useQueryClient } from '@tanstack/react-query'
+import Skeleton from '../components/Skeleton'
+import { useAuth } from '../contexts/AuthContext'
 
 type RangoTiempo = '1' | '3' | '7' | '21' | '30' | '180' | '365' | '1825' | 'all'
 
@@ -44,6 +46,7 @@ export default function Inventario() {
     fechaDesde: '',
     fechaHasta: '',
   })
+  const { permisos } = useAuth()
 
   // Calcular fechas según rango
   const fechaDesde = useMemo(() => {
@@ -171,12 +174,7 @@ export default function Inventario() {
     }))
   }
 
-  // Verificar si tiene permiso de escritura (simplificado, deberías verificar con el backend)
-  const tieneEscrituraMovimiento = true // Esto debería venir del contexto de auth
-
-  if (isLoading) {
-    return <div className="text-center py-8">Cargando...</div>
-  }
+  const tieneEscrituraMovimiento = permisos.includes('escritura:movimiento')
 
   return (
     <div>
@@ -319,7 +317,9 @@ export default function Inventario() {
       {/* Gráfico */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Evolución del Stock</h2>
-        {datosFormateados.length > 0 ? (
+        {isLoading ? (
+          <Skeleton className="h-[400px] w-full" />
+        ) : datosFormateados.length > 0 ? (
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={datosFormateados}>
               <CartesianGrid strokeDasharray="2 2" strokeWidth={0.5} />

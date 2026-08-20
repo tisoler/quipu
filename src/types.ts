@@ -13,6 +13,7 @@ export enum TipoMovimiento {
   COMPRA = 'compra',
   CONSUMO = 'consumo',
   PRODUCCION = 'produccion',
+  TRANSFERENCIA = 'transferencia',
 }
 
 export enum TipoArticulo {
@@ -24,3 +25,5 @@ export enum EstadoMovimiento {
   ACTIVO = 'activo',
   ELIMINADO = 'eliminado',
 }
+
+export type TipoProducto = 'A' | 'B' | 'C' | null;

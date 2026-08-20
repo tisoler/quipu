@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { TipoMovimiento, TipoArticulo } from '../types'
+import Autocomplete from './Autocomplete'
 
 interface Producto {
   id: number
@@ -23,13 +24,20 @@ interface Almacen {
 interface MovimientoModalProps {
   onClose: () => void
   onSuccess?: () => void
+  fixedTipoArticulo?: TipoArticulo | ''
+  fixedTipoMovimiento?: TipoMovimiento | ''
 }
 
-export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalProps) {
+export default function MovimientoModal({
+  onClose,
+  onSuccess,
+  fixedTipoArticulo = '',
+  fixedTipoMovimiento = '',
+}: MovimientoModalProps) {
   const [formData, setFormData] = useState({
-    tipoArticulo: '' as TipoArticulo | '',
+    tipoArticulo: fixedTipoArticulo || '' as TipoArticulo | '',
     idArticulo: '',
-    tipoMovimiento: '' as TipoMovimiento | '',
+    tipoMovimiento: fixedTipoMovimiento || '' as TipoMovimiento | '',
     cantidad: '',
     precio: '',
     idAlmacen: '',
@@ -37,6 +45,8 @@ export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalP
   })
 
   const queryClient = useQueryClient()
+
+  const titulo = `Ingresar ${fixedTipoMovimiento ?? 'movimiento'}`
 
   const { data: productos = [] } = useQuery<Producto[]>({
     queryKey: ['productos'],
@@ -86,7 +96,7 @@ export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalP
 
   const articuloSeleccionado = useMemo(() => {
     if (!formData.idArticulo) return null
-    return articulosDisponibles.find((a) => a.id === parseInt(formData.idArticulo))
+    return articulosDisponibles.find((a: any) => a.id === parseInt(formData.idArticulo))
   }, [formData.idArticulo, articulosDisponibles])
 
   const total = useMemo(() => {
@@ -97,7 +107,7 @@ export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalP
 
   useEffect(() => {
     if (articuloSeleccionado) {
-      setFormData((prev) => ({ ...prev, precio: articuloSeleccionado.precio.toString() }))
+      setFormData((prev: any) => ({ ...prev, precio: articuloSeleccionado.precio.toString() }))
     }
   }, [articuloSeleccionado])
 
@@ -113,87 +123,87 @@ export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalP
     })
   }
 
+  const articuloOptions = useMemo(() =>
+    articulosDisponibles.map((a: any) => ({ id: a.id, label: a.nombre })),
+    [articulosDisponibles]
+  )
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Nuevo Movimiento</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">{titulo}</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tipo Artículo *
-              </label>
-              <select
-                required
-                value={formData.tipoArticulo}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    tipoArticulo: e.target.value as TipoArticulo,
-                    idArticulo: '',
-                    precio: '',
-                  }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">Seleccione...</option>
-                <option value={TipoArticulo.PRODUCTO}>Producto</option>
-                <option value={TipoArticulo.MATERIAL}>Material</option>
-              </select>
-            </div>
+            {!fixedTipoArticulo && (
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo Artículo *
+                </label>
+                <select
+                  required
+                  value={formData.tipoArticulo}
+                  onChange={(e) =>
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      tipoArticulo: e.target.value as TipoArticulo,
+                      idArticulo: '',
+                      precio: '',
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value={TipoArticulo.PRODUCTO}>Producto</option>
+                  <option value={TipoArticulo.MATERIAL}>Material</option>
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Artículo *
-              </label>
-              <select
-                required
-                value={formData.idArticulo}
-                onChange={(e) => setFormData((prev) => ({ ...prev, idArticulo: e.target.value }))}
-                disabled={!formData.tipoArticulo}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
-              >
-                <option value="">Seleccione...</option>
-                {articulosDisponibles.map((articulo) => (
-                  <option key={articulo.id} value={articulo.id}>
-                    {articulo.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Autocomplete
+              label={fixedTipoArticulo ? fixedTipoArticulo.charAt(0).toUpperCase() + fixedTipoArticulo.slice(1) : "Artículo"}
+              required
+              options={articuloOptions}
+              value={formData.idArticulo}
+              onChange={(val) => setFormData((prev: any) => ({ ...prev, idArticulo: val.toString() }))}
+              disabled={!formData.tipoArticulo}
+              placeholder={formData.tipoArticulo ? `Buscar ${fixedTipoArticulo ?? 'artículo'}...` : "Primero seleccione tipo"}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tipo Movimiento *
-              </label>
-              <select
-                required
-                value={formData.tipoMovimiento}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, tipoMovimiento: e.target.value as TipoMovimiento }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">Seleccione...</option>
-                <option value={TipoMovimiento.VENTA}>Venta</option>
-                <option value={TipoMovimiento.COMPRA}>Compra</option>
-                <option value={TipoMovimiento.CONSUMO}>Consumo</option>
-                <option value={TipoMovimiento.PRODUCCION}>Producción</option>
-              </select>
-            </div>
+            {!fixedTipoMovimiento && (
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo Movimiento *
+                </label>
+                <select
+                  required
+                  value={formData.tipoMovimiento}
+                  onChange={(e) =>
+                    setFormData((prev: any) => ({ ...prev, tipoMovimiento: e.target.value as TipoMovimiento }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value={TipoMovimiento.VENTA}>Venta</option>
+                  <option value={TipoMovimiento.COMPRA}>Compra</option>
+                  <option value={TipoMovimiento.CONSUMO}>Consumo</option>
+                  <option value={TipoMovimiento.PRODUCCION}>Producción</option>
+                  <option value={TipoMovimiento.TRANSFERENCIA}>Transferencia</option>
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Almacén *
               </label>
               <select
                 required
                 value={formData.idAlmacen}
-                onChange={(e) => setFormData((prev) => ({ ...prev, idAlmacen: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                onChange={(e) => setFormData((prev: any) => ({ ...prev, idAlmacen: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               >
                 <option value="">Seleccione...</option>
-                {almacenes.map((almacen) => (
+                {almacenes.map((almacen: any) => (
                   <option key={almacen.id} value={almacen.id}>
                     {almacen.nombre}
                   </option>
@@ -201,72 +211,73 @@ export default function MovimientoModal({ onClose, onSuccess }: MovimientoModalP
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Cantidad *
-              </label>
-              <input
-                type="number"
-                required
-                min="0.01"
-                step="0.01"
-                value={formData.cantidad}
-                onChange={(e) => setFormData((prev) => ({ ...prev, cantidad: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Cantidad *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0.01"
+                  step="0.01"
+                  value={formData.cantidad}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, cantidad: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Precio *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={formData.precio}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, precio: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Precio *
-              </label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={formData.precio}
-                onChange={(e) => setFormData((prev) => ({ ...prev, precio: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total
               </label>
-              <input
-                type="number"
-                value={total.toFixed(2)}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
+              <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white font-mono font-bold">
+                $ {total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Descripción
               </label>
               <textarea
                 value={formData.descripcion}
-                onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                onChange={(e) => setFormData((prev: any) => ({ ...prev, descripcion: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 rows={3}
+                placeholder="Notas adicionales..."
               />
             </div>
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
+
+          <div className="mt-8 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
             >
               {createMutation.isPending ? 'Guardando...' : 'Guardar'}
             </button>

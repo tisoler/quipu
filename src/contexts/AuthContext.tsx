@@ -1,82 +1,80 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+} from 'firebase/auth'
+import { auth } from '../lib/firebase'
 import api from '../lib/api'
 
 interface User {
   id: number
   nombreUsuario: string
   idEmpresa: number
+  nombreEmpresa: string
+  roles: string[]
+  permisos: string[]
 }
 
 interface AuthContextType {
   user: User | null
-  isAuthenticated: boolean
+  firebaseUser: FirebaseUser | null
   loading: boolean
-  login: (nombreUsuario: string, password: string) => Promise<void>
-  logout: () => void
+  permisos: string[]
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [permisos, setPermisos] = useState<string[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken')
-    const refreshToken = localStorage.getItem('refreshToken')
-    
-    if (accessToken && refreshToken) {
-      // Intentar validar el token decodificándolo (sin verificar, solo para obtener datos)
-      try {
-        const payload = JSON.parse(atob(accessToken.split('.')[1]))
-        setUser({
-          id: payload.sub,
-          nombreUsuario: payload.nombreUsuario,
-          idEmpresa: payload.idEmpresa,
-        })
-        setIsAuthenticated(true)
-      } catch (error) {
-        // Si el token es inválido, limpiar y redirigir
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+    const unsubscribe = onAuthStateChanged(auth, async (currentFirebaseUser) => {
+      setLoading(true)
+      if (currentFirebaseUser) {
+        setFirebaseUser(currentFirebaseUser)
+        try {
+          // Esperar un momento a que el token este disponible
+          await currentFirebaseUser.getIdToken()
+          // Pedir al backend los detalles del usuario
+          const response = await api.get('/auth/me')
+          const userData = response.data
+          setUser(userData)
+          setPermisos(userData.permisos || [])
+        } catch (error) {
+          console.error('Error obteniendo perfil del backend', error)
+          // Si el usuario no existe en la BD o falla la conexion, 
+          // probablemente deberiamos desloguearlo o mostrar un error
+          setUser(null)
+          setPermisos([])
+        }
+      } else {
+        setFirebaseUser(null)
+        setUser(null)
+        setPermisos([])
       }
-    }
-    setLoading(false)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [])
 
-  const login = async (nombreUsuario: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', {
-        nombreUsuario,
-        password,
-      })
-
-      const { accessToken, refreshToken, user: userData } = response.data
-
-      localStorage.setItem('accessToken', accessToken)
-      localStorage.setItem('refreshToken', refreshToken)
-
-      setUser(userData)
-      setIsAuthenticated(true)
-      navigate('/')
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Error al iniciar sesión')
-    }
-  }
-
-  const logout = () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
+  const logout = async () => {
+    await signOut(auth)
     setUser(null)
-    setIsAuthenticated(false)
+    setFirebaseUser(null)
+    setPermisos([])
     navigate('/login')
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, firebaseUser, permisos, loading, logout }}>
       {children}
     </AuthContext.Provider>
   )

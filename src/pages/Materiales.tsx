@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { EstadoMaterial } from '../types'
+import DataTable from '../components/DataTable'
 
 interface Material {
   id: number
   nombre: string
+  codigo?: string
   descripcion?: string
   presentacion?: string
   estado: EstadoMaterial
@@ -75,6 +77,7 @@ export default function Materiales() {
     const formData = new FormData(e.currentTarget)
     const data = {
       nombre: formData.get('nombre') as string,
+      codigo: formData.get('codigo') as string,
       descripcion: formData.get('descripcion') as string,
       presentacion: formData.get('presentacion') as string,
       estado: (formData.get('estado') as EstadoMaterial) || EstadoMaterial.ACTIVO,
@@ -90,14 +93,10 @@ export default function Materiales() {
   }
 
   const handleEstadoChange = (id: number, currentEstado: EstadoMaterial) => {
-    const newEstado = currentEstado === EstadoMaterial.ACTIVO 
-      ? EstadoMaterial.NO_ACTIVO 
+    const newEstado = currentEstado === EstadoMaterial.ACTIVO
+      ? EstadoMaterial.NO_ACTIVO
       : EstadoMaterial.ACTIVO
     updateEstadoMutation.mutate({ id, estado: newEstado })
-  }
-
-  if (isLoading) {
-    return <div className="text-center py-8">Cargando...</div>
   }
 
   return (
@@ -112,87 +111,49 @@ export default function Materiales() {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Nombre
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Descripción
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Presentación
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Stock Mínimo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Precio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {materiales.map((material) => (
-                <tr
-                  key={material.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                  onClick={() => handleEdit(material)}
+      <div className="mb-6">
+        <DataTable
+          isLoading={isLoading}
+          data={materiales}
+          onRowClick={handleEdit}
+          columns={[
+            { header: 'Nombre', key: 'nombre', className: 'font-semibold' },
+            { header: 'Código', key: 'codigo', className: 'font-mono' },
+            { header: 'Descripción', key: 'descripcion', wrap: true },
+            { header: 'Presentación', key: 'presentacion' },
+            {
+              header: 'Estado',
+              key: 'estado',
+              render: (m: Material) => (
+                <span
+                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${m.estado === EstadoMaterial.ACTIVO
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    }`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {material.nombre}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {material.descripcion || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {material.presentacion || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        material.estado === EstadoMaterial.ACTIVO
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}
-                    >
-                      {material.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {material.stockMinimo}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    ${material.precio}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEstadoChange(material.id, material.estado)
-                      }}
-                      className={`mr-2 px-3 py-1 rounded ${
-                        material.estado === EstadoMaterial.ACTIVO
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200'
-                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200'
-                      }`}
-                    >
-                      {material.estado === EstadoMaterial.ACTIVO ? 'Desactivar' : 'Activar'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  {m.estado}
+                </span>
+              ),
+              className: 'text-center',
+            },
+            { header: 'Stock Mín.', key: 'stockMinimo', type: 'number' },
+            { header: 'Precio', key: 'precio', type: 'currency' },
+          ]}
+          renderActions={(m: Material) => (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleEstadoChange(m.id, m.estado)
+              }}
+              className={`px-3 py-1 rounded text-xs font-medium ${m.estado === EstadoMaterial.ACTIVO
+                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                }`}
+            >
+              {m.estado === EstadoMaterial.ACTIVO ? 'Desactivar' : 'Activar'}
+            </button>
+          )}
+        />
       </div>
 
       {isModalOpen && (
@@ -222,8 +183,8 @@ function MaterialModal({
   isLoading: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
           {material ? 'Editar Material' : 'Nuevo Material'}
         </h2>
@@ -238,6 +199,17 @@ function MaterialModal({
                 name="nombre"
                 required
                 defaultValue={material?.nombre || ''}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Código
+              </label>
+              <input
+                type="text"
+                name="codigo"
+                defaultValue={material?.codigo || ''}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>

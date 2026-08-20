@@ -14,11 +14,24 @@ Aplicación frontend para Quipu, construida con React, Vite, TypeScript y Tailwi
 pnpm install
 ```
 
-2. Configurar variables de entorno (opcional):
+2. Configurar variables de entorno:
 ```bash
-# Crear .env.local si necesitas cambiar la URL de la API
-VITE_API_URL=http://localhost:3000/api
+# Crear archivo .env en la raíz del proyecto (quipu/)
+# Copia .env.example a .env y ajusta los valores
+cp .env.example .env
+
+# Edita .env y configura:
+VITE_API_URL=http://localhost:3001/api
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_MEASUREMENT_ID=
 ```
+
+**Nota**: Vite solo lee variables que empiezan con `VITE_`. El archivo `.env` se carga automáticamente en desarrollo.
 
 3. Iniciar el servidor de desarrollo:
 ```bash
