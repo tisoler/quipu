@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import Loading from './components/Loading'
 import Login from './pages/Login'
 import Layout from './components/Layout'
@@ -12,6 +13,13 @@ import Inventario from './pages/Inventario'
 import StockActual from './pages/StockActual'
 import MoverStock from './pages/MoverStock'
 import Rubros from './pages/Rubros'
+import Proveedores from './pages/Proveedores'
+import PuestoVenta from './pages/PuestoVenta'
+import Cajas from './pages/Cajas'
+import CajaCentral from './pages/CajaCentral'
+import Clientes from './pages/Clientes'
+import Ventas from './pages/Ventas'
+import Configuracion from './pages/Configuracion'
 
 import { TipoArticulo, TipoMovimiento } from './types'
 
@@ -33,6 +41,15 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Redirección por defecto: un vendedor puro (con permiso de puesto de venta y sin
+// permisos de gestión) entra directo al puesto; el resto al dashboard.
+function RedirectHome() {
+  const { permisos, loading } = useAuth()
+  if (loading) return <Loading />
+  const esVendedor = permisos.includes('escritura:puesto-venta') && !permisos.includes('lectura:movimiento')
+  return <Navigate to={esVendedor ? '/puesto' : '/'} replace />
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -46,10 +63,18 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="home" element={<RedirectHome />} />
+        <Route path="puesto" element={<PuestoVenta />} />
+        <Route path="cajas" element={<Cajas />} />
+        <Route path="caja-central" element={<CajaCentral />} />
         <Route path="productos" element={<Productos />} />
         <Route path="materiales" element={<Materiales />} />
         <Route path="almacenes" element={<Almacenes />} />
         <Route path="rubros" element={<Rubros />} />
+        <Route path="proveedores" element={<Proveedores />} />
+        <Route path="clientes" element={<Clientes />} />
+        <Route path="ventas" element={<Ventas />} />
+        <Route path="configuracion" element={<Configuracion />} />
         <Route path="movimientos" element={<Movimientos />} />
         <Route
           path="compra-productos"
@@ -106,9 +131,11 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 

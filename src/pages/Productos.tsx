@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
 import api from '../lib/api'
 import { EstadoProducto } from '../types'
 import DataTable from '../components/DataTable'
+import PageHeader from '../components/PageHeader'
+import Modal from '../components/Modal'
 
 interface Producto {
   id: number
@@ -13,11 +16,22 @@ interface Producto {
   estado: EstadoProducto
   stockMinimo: number
   precio: number
+  precioConIva?: boolean
+  alicuotaIva?: number
   tipoProducto?: 'A' | 'B' | 'C' | null
   rubros?: Rubro[]
+  talle?: string | null
+  color?: string | null
+  idProveedor?: number | null
+  proveedor?: ProveedorRef | null
 }
 
 interface Rubro {
+  id: number
+  nombre: string
+}
+
+interface ProveedorRef {
   id: number
   nombre: string
 }
@@ -39,6 +53,14 @@ export default function Productos() {
     queryKey: ['rubros'],
     queryFn: async () => {
       const response = await api.get('/rubros')
+      return response.data
+    },
+  })
+
+  const { data: proveedores = [] } = useQuery<ProveedorRef[]>({
+    queryKey: ['proveedores'],
+    queryFn: async () => {
+      const response = await api.get('/proveedores')
       return response.data
     },
   })
@@ -104,7 +126,12 @@ export default function Productos() {
       estado: (formData.get('estado') as EstadoProducto) || EstadoProducto.ACTIVO,
       stockMinimo: Number(formData.get('stockMinimo')),
       precio: Number(formData.get('precio')),
+      precioConIva: formData.get('precioConIva') === 'on',
+      alicuotaIva: Number(formData.get('alicuotaIva')) || 21,
       tipoProducto: (formData.get('tipoProducto') as 'A' | 'B' | 'C' | '') || null,
+      talle: (formData.get('talle') as string) || null,
+      color: (formData.get('color') as string) || null,
+      idProveedor: Number(formData.get('idProveedor')) || null,
       rubroIds,
     }
 
@@ -124,15 +151,16 @@ export default function Productos() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Productos</h1>
-        <button
-          onClick={handleNew}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Agregar Producto
-        </button>
-      </div>
+      <PageHeader
+        title="Productos"
+        description="Catálogo de productos terminados."
+        actions={
+          <button onClick={handleNew} className="btn-primary">
+            <Plus size={16} strokeWidth={2} />
+            Agregar Producto
+          </button>
+        }
+      />
 
       <div className="mb-6">
         <DataTable
@@ -144,6 +172,13 @@ export default function Productos() {
             { header: 'Código', key: 'codigo', className: 'font-mono' },
             { header: 'Descripción', key: 'descripcion', wrap: true },
             { header: 'Presentación', key: 'presentacion' },
+            { header: 'Talle', key: 'talle' },
+            { header: 'Color', key: 'color' },
+            {
+              header: 'Proveedor',
+              key: 'proveedor',
+              render: (p: Producto) => p.proveedor?.nombre || '-',
+            },
             {
               header: 'Estado',
               key: 'estado',
@@ -199,6 +234,7 @@ export default function Productos() {
         <ProductoModal
           producto={selectedProducto}
           rubrosDisponibles={rubros}
+          proveedoresDisponibles={proveedores}
           onClose={() => {
             setIsModalOpen(false)
             setSelectedProducto(null)
@@ -214,12 +250,14 @@ export default function Productos() {
 function ProductoModal({
   producto,
   rubrosDisponibles,
+  proveedoresDisponibles,
   onClose,
   onSubmit,
   isLoading,
 }: {
   producto: Producto | null
   rubrosDisponibles: Rubro[]
+  proveedoresDisponibles: ProveedorRef[]
   onClose: () => void
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
   isLoading: boolean
@@ -227,148 +265,183 @@ function ProductoModal({
   const currentRubrosIds = useMemo(() => producto?.rubros?.map(r => r.id) || [], [producto])
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-          {producto ? 'Editar Producto' : 'Nuevo Producto'}
-        </h2>
-        <form onSubmit={onSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nombre *
+    <Modal
+      title={producto ? 'Editar Producto' : 'Nuevo Producto'}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn-secondary">
+            Cancelar
+          </button>
+          <button type="submit" form="producto-form" disabled={isLoading} className="btn-primary">
+            {isLoading ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      }
+    >
+      <form id="producto-form" onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="md:col-span-2">
+          <label className="form-label">Nombre *</label>
+          <input
+            type="text"
+            name="nombre"
+            required
+            autoFocus
+            defaultValue={producto?.nombre || ''}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Código</label>
+          <input
+            type="text"
+            name="codigo"
+            defaultValue={producto?.codigo || ''}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Presentación</label>
+          <input
+            type="text"
+            name="presentacion"
+            defaultValue={producto?.presentacion || ''}
+            className="form-input"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="form-label">Descripción</label>
+          <textarea
+            name="descripcion"
+            defaultValue={producto?.descripcion || ''}
+            className="form-input"
+            rows={3}
+          />
+        </div>
+        <div>
+          <label className="form-label">Estado</label>
+          <select
+            name="estado"
+            defaultValue={producto?.estado || EstadoProducto.ACTIVO}
+            className="form-input"
+          >
+            <option value={EstadoProducto.ACTIVO}>Activo</option>
+            <option value={EstadoProducto.NO_ACTIVO}>No Activo</option>
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Tipo (ABC)</label>
+          <select
+            name="tipoProducto"
+            defaultValue={producto?.tipoProducto || ''}
+            className="form-input"
+          >
+            <option value="">Ninguno</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Stock Mínimo</label>
+          <input
+            type="number"
+            name="stockMinimo"
+            min="0"
+            defaultValue={producto?.stockMinimo || 0}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Precio</label>
+          <input
+            type="number"
+            name="precio"
+            min="0"
+            step="0.01"
+            defaultValue={producto?.precio || 0}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Alícuota de IVA</label>
+          <select
+            name="alicuotaIva"
+            defaultValue={String(producto?.alicuotaIva ?? 21)}
+            className="form-input"
+          >
+            <option value="21">21%</option>
+            <option value="10.5">10,5%</option>
+            <option value="27">27%</option>
+            <option value="5">5%</option>
+            <option value="2.5">2,5%</option>
+            <option value="0">0%</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer pt-5">
+            <input
+              type="checkbox"
+              name="precioConIva"
+              defaultChecked={producto?.precioConIva || false}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+            />
+            <span>Precio incluye IVA</span>
+          </label>
+        </div>
+        <div>
+          <label className="form-label">Talle</label>
+          <input
+            type="text"
+            name="talle"
+            defaultValue={producto?.talle || ''}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Color</label>
+          <input
+            type="text"
+            name="color"
+            defaultValue={producto?.color || ''}
+            className="form-input"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="form-label">Proveedor</label>
+          <select
+            name="idProveedor"
+            defaultValue={producto?.idProveedor ?? ''}
+            className="form-input"
+          >
+            <option value="">Sin proveedor</option>
+            {proveedoresDisponibles.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="form-label">Rubros</label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-36 overflow-y-auto p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
+            {rubrosDisponibles.length === 0 && (
+              <p className="col-span-full text-sm text-gray-400 dark:text-gray-500">No hay rubros cargados.</p>
+            )}
+            {rubrosDisponibles.map(rubro => (
+              <label key={rubro.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name={`rubro_${rubro.id}`}
+                  defaultChecked={currentRubrosIds.includes(rubro.id)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                />
+                <span>{rubro.nombre}</span>
               </label>
-              <input
-                type="text"
-                name="nombre"
-                required
-                defaultValue={producto?.nombre || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Código
-              </label>
-              <input
-                type="text"
-                name="codigo"
-                defaultValue={producto?.codigo || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Descripción
-              </label>
-              <textarea
-                name="descripcion"
-                defaultValue={producto?.descripcion || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Presentación
-              </label>
-              <input
-                type="text"
-                name="presentacion"
-                defaultValue={producto?.presentacion || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Estado
-              </label>
-              <select
-                name="estado"
-                defaultValue={producto?.estado || EstadoProducto.ACTIVO}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value={EstadoProducto.ACTIVO}>Activo</option>
-                <option value={EstadoProducto.NO_ACTIVO}>No Activo</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Stock Mínimo
-              </label>
-              <input
-                type="number"
-                name="stockMinimo"
-                min="0"
-                defaultValue={producto?.stockMinimo || 0}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Precio
-              </label>
-              <input
-                type="number"
-                name="precio"
-                min="0"
-                step="0.01"
-                defaultValue={producto?.precio || 0}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tipo (ABC)
-              </label>
-              <select
-                name="tipoProducto"
-                defaultValue={producto?.tipoProducto || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">Ninguno</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Rubros
-              </label>
-              <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border border-gray-300 dark:border-gray-700 rounded-md">
-                {rubrosDisponibles.map(rubro => (
-                  <label key={rubro.id} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-                    <input
-                      type="checkbox"
-                      name={`rubro_${rubro.id}`}
-                      defaultChecked={currentRubrosIds.includes(rubro.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>{rubro.nombre}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   )
 }

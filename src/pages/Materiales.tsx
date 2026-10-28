@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
 import api from '../lib/api'
 import { EstadoMaterial } from '../types'
 import DataTable from '../components/DataTable'
+import PageHeader from '../components/PageHeader'
+import Modal from '../components/Modal'
+
+interface ProveedorRef {
+  id: number
+  nombre: string
+}
 
 interface Material {
   id: number
@@ -13,6 +21,8 @@ interface Material {
   estado: EstadoMaterial
   stockMinimo: number
   precio: number
+  idProveedor?: number | null
+  proveedor?: ProveedorRef | null
 }
 
 export default function Materiales() {
@@ -24,6 +34,14 @@ export default function Materiales() {
     queryKey: ['materiales'],
     queryFn: async () => {
       const response = await api.get('/materiales')
+      return response.data
+    },
+  })
+
+  const { data: proveedores = [] } = useQuery<ProveedorRef[]>({
+    queryKey: ['proveedores'],
+    queryFn: async () => {
+      const response = await api.get('/proveedores')
       return response.data
     },
   })
@@ -83,6 +101,7 @@ export default function Materiales() {
       estado: (formData.get('estado') as EstadoMaterial) || EstadoMaterial.ACTIVO,
       stockMinimo: Number(formData.get('stockMinimo')),
       precio: Number(formData.get('precio')),
+      idProveedor: Number(formData.get('idProveedor')) || null,
     }
 
     if (selectedMaterial) {
@@ -101,15 +120,16 @@ export default function Materiales() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Materiales</h1>
-        <button
-          onClick={handleNew}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Agregar Material
-        </button>
-      </div>
+      <PageHeader
+        title="Materiales"
+        description="Insumos y materias primas utilizados en la producción."
+        actions={
+          <button onClick={handleNew} className="btn-primary">
+            <Plus size={16} strokeWidth={2} />
+            Agregar Material
+          </button>
+        }
+      />
 
       <div className="mb-6">
         <DataTable
@@ -159,6 +179,7 @@ export default function Materiales() {
       {isModalOpen && (
         <MaterialModal
           material={selectedMaterial}
+          proveedoresDisponibles={proveedores}
           onClose={() => {
             setIsModalOpen(false)
             setSelectedMaterial(null)
@@ -173,125 +194,121 @@ export default function Materiales() {
 
 function MaterialModal({
   material,
+  proveedoresDisponibles,
   onClose,
   onSubmit,
   isLoading,
 }: {
   material: Material | null
+  proveedoresDisponibles: ProveedorRef[]
   onClose: () => void
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
   isLoading: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-          {material ? 'Editar Material' : 'Nuevo Material'}
-        </h2>
-        <form onSubmit={onSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nombre *
-              </label>
-              <input
-                type="text"
-                name="nombre"
-                required
-                defaultValue={material?.nombre || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Código
-              </label>
-              <input
-                type="text"
-                name="codigo"
-                defaultValue={material?.codigo || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Descripción
-              </label>
-              <textarea
-                name="descripcion"
-                defaultValue={material?.descripcion || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Presentación
-              </label>
-              <input
-                type="text"
-                name="presentacion"
-                defaultValue={material?.presentacion || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Estado
-              </label>
-              <select
-                name="estado"
-                defaultValue={material?.estado || EstadoMaterial.ACTIVO}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value={EstadoMaterial.ACTIVO}>Activo</option>
-                <option value={EstadoMaterial.NO_ACTIVO}>No Activo</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Stock Mínimo
-              </label>
-              <input
-                type="number"
-                name="stockMinimo"
-                min="0"
-                defaultValue={material?.stockMinimo || 0}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Precio
-              </label>
-              <input
-                type="number"
-                name="precio"
-                min="0"
-                step="0.01"
-                defaultValue={material?.precio || 0}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
+    <Modal
+      title={material ? 'Editar Material' : 'Nuevo Material'}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn-secondary">
+            Cancelar
+          </button>
+          <button type="submit" form="material-form" disabled={isLoading} className="btn-primary">
+            {isLoading ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      }
+    >
+      <form id="material-form" onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="md:col-span-2">
+          <label className="form-label">Nombre *</label>
+          <input
+            type="text"
+            name="nombre"
+            required
+            autoFocus
+            defaultValue={material?.nombre || ''}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Código</label>
+          <input
+            type="text"
+            name="codigo"
+            defaultValue={material?.codigo || ''}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Presentación</label>
+          <input
+            type="text"
+            name="presentacion"
+            defaultValue={material?.presentacion || ''}
+            className="form-input"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="form-label">Descripción</label>
+          <textarea
+            name="descripcion"
+            defaultValue={material?.descripcion || ''}
+            className="form-input"
+            rows={3}
+          />
+        </div>
+        <div>
+          <label className="form-label">Estado</label>
+          <select
+            name="estado"
+            defaultValue={material?.estado || EstadoMaterial.ACTIVO}
+            className="form-input"
+          >
+            <option value={EstadoMaterial.ACTIVO}>Activo</option>
+            <option value={EstadoMaterial.NO_ACTIVO}>No Activo</option>
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Proveedor</label>
+          <select
+            name="idProveedor"
+            defaultValue={material?.idProveedor ?? ''}
+            className="form-input"
+          >
+            <option value="">Sin proveedor</option>
+            {proveedoresDisponibles.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="form-label">Stock Mínimo</label>
+            <input
+              type="number"
+              name="stockMinimo"
+              min="0"
+              defaultValue={material?.stockMinimo || 0}
+              className="form-input"
+            />
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Guardando...' : 'Guardar'}
-            </button>
+          <div>
+            <label className="form-label">Precio</label>
+            <input
+              type="number"
+              name="precio"
+              min="0"
+              step="0.01"
+              defaultValue={material?.precio || 0}
+              className="form-input"
+            />
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   )
 }

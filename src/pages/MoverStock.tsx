@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { TipoArticulo } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import PageHeader from '../components/PageHeader'
 
 interface Producto {
   id: number
@@ -125,9 +126,12 @@ export default function MoverStock() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Mover entre Almacenes</h1>
+      <PageHeader
+        title="Mover entre Almacenes"
+        description="Transferí stock de un depósito a otro."
+      />
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="card p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

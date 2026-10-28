@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { TipoMovimiento, TipoArticulo } from '../types'
 import Autocomplete from './Autocomplete'
+import Modal from './Modal'
 
 interface Producto {
   id: number
@@ -46,7 +47,7 @@ export default function MovimientoModal({
 
   const queryClient = useQueryClient()
 
-  const titulo = `Ingresar ${fixedTipoMovimiento ?? 'movimiento'}`
+  const titulo = `Ingresar ${fixedTipoMovimiento || 'movimiento'}`
 
   const { data: productos = [] } = useQuery<Producto[]>({
     queryKey: ['productos'],
@@ -129,161 +130,139 @@ export default function MovimientoModal({
   )
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">{titulo}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {!fixedTipoArticulo && (
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tipo Artículo *
-                </label>
-                <select
-                  required
-                  value={formData.tipoArticulo}
-                  onChange={(e) =>
-                    setFormData((prev: any) => ({
-                      ...prev,
-                      tipoArticulo: e.target.value as TipoArticulo,
-                      idArticulo: '',
-                      precio: '',
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                >
-                  <option value="">Seleccione...</option>
-                  <option value={TipoArticulo.PRODUCTO}>Producto</option>
-                  <option value={TipoArticulo.MATERIAL}>Material</option>
-                </select>
-              </div>
-            )}
-
-            <Autocomplete
-              label={fixedTipoArticulo ? fixedTipoArticulo.charAt(0).toUpperCase() + fixedTipoArticulo.slice(1) : "Artículo"}
+    <Modal
+      title={titulo}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn-secondary">
+            Cancelar
+          </button>
+          <button type="submit" form="movimiento-form" disabled={createMutation.isPending} className="btn-primary">
+            {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      }
+    >
+      <form id="movimiento-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {!fixedTipoArticulo && (
+          <div>
+            <label className="form-label">Tipo Artículo *</label>
+            <select
               required
-              options={articuloOptions}
-              value={formData.idArticulo}
-              onChange={(val) => setFormData((prev: any) => ({ ...prev, idArticulo: val.toString() }))}
-              disabled={!formData.tipoArticulo}
-              placeholder={formData.tipoArticulo ? `Buscar ${fixedTipoArticulo ?? 'artículo'}...` : "Primero seleccione tipo"}
+              value={formData.tipoArticulo}
+              onChange={(e) =>
+                setFormData((prev: any) => ({
+                  ...prev,
+                  tipoArticulo: e.target.value as TipoArticulo,
+                  idArticulo: '',
+                  precio: '',
+                }))
+              }
+              className="form-input"
+            >
+              <option value="">Seleccione...</option>
+              <option value={TipoArticulo.PRODUCTO}>Producto</option>
+              <option value={TipoArticulo.MATERIAL}>Material</option>
+            </select>
+          </div>
+        )}
+
+        {!fixedTipoMovimiento && (
+          <div>
+            <label className="form-label">Tipo Movimiento *</label>
+            <select
+              required
+              value={formData.tipoMovimiento}
+              onChange={(e) =>
+                setFormData((prev: any) => ({ ...prev, tipoMovimiento: e.target.value as TipoMovimiento }))
+              }
+              className="form-input"
+            >
+              <option value="">Seleccione...</option>
+              <option value={TipoMovimiento.VENTA}>Venta</option>
+              <option value={TipoMovimiento.COMPRA}>Compra</option>
+              <option value={TipoMovimiento.CONSUMO}>Consumo</option>
+              <option value={TipoMovimiento.PRODUCCION}>Producción</option>
+              <option value={TipoMovimiento.TRANSFERENCIA}>Transferencia</option>
+            </select>
+          </div>
+        )}
+
+        <Autocomplete
+          className="md:col-span-2"
+          label={fixedTipoArticulo ? fixedTipoArticulo.charAt(0).toUpperCase() + fixedTipoArticulo.slice(1) : "Artículo"}
+          required
+          options={articuloOptions}
+          value={formData.idArticulo}
+          onChange={(val) => setFormData((prev: any) => ({ ...prev, idArticulo: val.toString() }))}
+          disabled={!formData.tipoArticulo}
+          placeholder={formData.tipoArticulo ? `Buscar ${fixedTipoArticulo ?? 'artículo'}...` : "Primero seleccione tipo"}
+        />
+
+        <div>
+          <label className="form-label">Almacén *</label>
+          <select
+            required
+            value={formData.idAlmacen}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, idAlmacen: e.target.value }))}
+            className="form-input"
+          >
+            <option value="">Seleccione...</option>
+            {almacenes.map((almacen: any) => (
+              <option key={almacen.id} value={almacen.id}>
+                {almacen.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="form-label">Cantidad *</label>
+            <input
+              type="number"
+              required
+              min="0.01"
+              step="0.01"
+              value={formData.cantidad}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, cantidad: e.target.value }))}
+              className="form-input"
             />
-
-            {!fixedTipoMovimiento && (
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tipo Movimiento *
-                </label>
-                <select
-                  required
-                  value={formData.tipoMovimiento}
-                  onChange={(e) =>
-                    setFormData((prev: any) => ({ ...prev, tipoMovimiento: e.target.value as TipoMovimiento }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                >
-                  <option value="">Seleccione...</option>
-                  <option value={TipoMovimiento.VENTA}>Venta</option>
-                  <option value={TipoMovimiento.COMPRA}>Compra</option>
-                  <option value={TipoMovimiento.CONSUMO}>Consumo</option>
-                  <option value={TipoMovimiento.PRODUCCION}>Producción</option>
-                  <option value={TipoMovimiento.TRANSFERENCIA}>Transferencia</option>
-                </select>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Almacén *
-              </label>
-              <select
-                required
-                value={formData.idAlmacen}
-                onChange={(e) => setFormData((prev: any) => ({ ...prev, idAlmacen: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              >
-                <option value="">Seleccione...</option>
-                {almacenes.map((almacen: any) => (
-                  <option key={almacen.id} value={almacen.id}>
-                    {almacen.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Cantidad *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  value={formData.cantidad}
-                  onChange={(e) => setFormData((prev: any) => ({ ...prev, cantidad: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Precio *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={formData.precio}
-                  onChange={(e) => setFormData((prev: any) => ({ ...prev, precio: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Total
-              </label>
-              <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white font-mono font-bold">
-                $ {total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Descripción
-              </label>
-              <textarea
-                value={formData.descripcion}
-                onChange={(e) => setFormData((prev: any) => ({ ...prev, descripcion: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                rows={3}
-                placeholder="Notas adicionales..."
-              />
-            </div>
           </div>
 
-          <div className="mt-8 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
-            >
-              {createMutation.isPending ? 'Guardando...' : 'Guardar'}
-            </button>
+          <div>
+            <label className="form-label">Precio *</label>
+            <input
+              type="number"
+              required
+              min="0"
+              step="0.01"
+              value={formData.precio}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, precio: e.target.value }))}
+              className="form-input"
+            />
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div>
+          <label className="form-label">Total</label>
+          <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white font-mono font-bold text-sm">
+            $ {total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="form-label">Descripción</label>
+          <textarea
+            value={formData.descripcion}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, descripcion: e.target.value }))}
+            className="form-input"
+            rows={3}
+            placeholder="Notas adicionales..."
+          />
+        </div>
+      </form>
+    </Modal>
   )
 }

@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import { auth } from './firebase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3062/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3035/api'
 export const api = axios.create({
   baseURL: API_URL,
   headers: {

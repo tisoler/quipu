@@ -4,6 +4,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import api from '../lib/api'
 import { TipoArticulo } from '../types'
 import MovimientoModal from '../components/MovimientoModal'
+import PageHeader from '../components/PageHeader'
+import { Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import Skeleton from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
@@ -178,20 +180,21 @@ export default function Inventario() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Inventario</h1>
-        {tieneEscrituraMovimiento && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            + Agregar Movimiento
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Historial de Inventario"
+        description="Consultá y filtrá todos los movimientos de stock."
+        actions={
+          tieneEscrituraMovimiento ? (
+            <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+              <Plus size={16} strokeWidth={2} />
+              Agregar Movimiento
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+      <div className="card p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Tipo Artículo */}
           <div>

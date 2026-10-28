@@ -5,6 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quipu</title>
+    <!-- Aplica el tema antes del primer pintado para evitar flash.
+         Por defecto sigue la preferencia del navegador. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('quipu-theme')
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var dark = stored ? stored === 'dark' : prefersDark
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) { }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -99,14 +99,17 @@ export default function DataTable<T extends { id: number | string }>({
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full ring-1 ring-black/[0.05] dark:ring-white/[0.05] overflow-hidden">
       {/* Vista Desktop: Tabla */}
       <div className="hidden md:block overflow-x-auto flex-1">
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700/50">
-          <thead className="bg-gray-50/50 dark:bg-gray-900/40 backdrop-blur-sm sticky top-0 z-10">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0 z-10">
             <tr>
               {columns.filter(c => !c.mobileOnly).map((column, idx) => (
                 <th
                   key={idx}
                   className={clsx(
-                    "px-6 py-4 text-center text-[12px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest",
+                    "px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                    column.type === 'boolean'
+                      ? 'text-center'
+                      : (column.type === 'currency' || column.type === 'number') ? 'text-right' : 'text-left',
                     column.className
                   )}
                 >
@@ -114,7 +117,7 @@ export default function DataTable<T extends { id: number | string }>({
                 </th>
               ))}
               {renderActions && (
-                <th className="px-6 py-4 text-center text-[12px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Acciones
                 </th>
               )}
@@ -126,17 +129,17 @@ export default function DataTable<T extends { id: number | string }>({
                 key={item.id}
                 onClick={() => onRowClick?.(item)}
                 className={clsx(
-                  "transition-all duration-200",
-                  onRowClick ? "hover:bg-blue-50/30 dark:hover:bg-blue-400/5 cursor-pointer active:scale-[0.998]" : "hover:bg-gray-50/50 dark:hover:bg-white/5"
+                  "transition-colors",
+                  onRowClick ? "hover:bg-blue-50/50 dark:hover:bg-blue-400/5 cursor-pointer" : "hover:bg-gray-50 dark:hover:bg-white/5"
                 )}
               >
                 {columns.filter(c => !c.mobileOnly).map((column, idx) => (
                   <td
                     key={idx}
                     className={clsx(
-                      "px-4 py-4 text-sm text-gray-600 dark:text-gray-300",
+                      "px-4 py-3 text-sm text-gray-600 dark:text-gray-300",
                       !column.wrap && "whitespace-nowrap",
-                      (column.type === 'currency' || column.type === 'number') ? 'text-right font-mono' : '',
+                      (column.type === 'currency' || column.type === 'number') ? 'text-right font-mono tabular-nums' : '',
                       column.className
                     )}
                   >
@@ -144,8 +147,8 @@ export default function DataTable<T extends { id: number | string }>({
                   </td>
                 ))}
                 {renderActions && (
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                    <div className="inline-flex justify-center gap-2">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                    <div className="inline-flex justify-end gap-2">
                       {renderActions(item)}
                     </div>
                   </td>
@@ -162,20 +165,20 @@ export default function DataTable<T extends { id: number | string }>({
           <div
             key={item.id}
             onClick={() => onRowClick?.(item)}
-            className="px-6 py-5 space-y-4 bg-white dark:bg-transparent active:bg-gray-50/80 dark:active:bg-gray-700/30 transition-all duration-200"
+            className="px-6 py-4 space-y-3 bg-white dark:bg-transparent active:bg-gray-50 dark:active:bg-gray-700/30 transition-colors"
           >
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-2">
               {columns.filter(c => !c.hideOnMobile).map((column, idx) => {
                 const isHeader = idx === 0;
                 return (
                   <div key={idx} className={clsx("flex justify-between items-start gap-4")}>
-                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-100 uppercase tracking-widest min-w-[100px] pt-1 leading-none shrink-0">
+                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500 min-w-[100px] pt-0.5 leading-5 shrink-0">
                       {column.header}
                     </span>
                     <div className={clsx(
                       "text-sm break-words flex-1 text-right",
-                      isHeader ? "font-bold text-gray-900 dark:text-white" : "text-gray-700 dark:text-gray-100",
-                      (column.type === 'currency' || column.type === 'number') ? 'font-mono' : '',
+                      isHeader ? "font-semibold text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300",
+                      (column.type === 'currency' || column.type === 'number') ? 'font-mono tabular-nums' : '',
                     )}>
                       {renderCellValue(item, column)}
                     </div>
@@ -185,12 +188,9 @@ export default function DataTable<T extends { id: number | string }>({
             </div>
             {renderActions && (
               <div
-                className="pt-4 mt-2 border-t border-gray-100/80 dark:border-gray-700/50 flex flex-wrap gap-3 justify-between items-center"
+                className="pt-3 mt-1 border-t border-gray-100 dark:border-gray-700/50 flex flex-wrap gap-3 justify-end items-center"
                 onClick={(e) => e.stopPropagation()}
               >
-                <span className="text-[11px] font-bold text-gray-700 dark:text-gray-100 uppercase tracking-widest min-w-[100px] pt-1 leading-none shrink-0">
-                  Acciones
-                </span>
                 {renderActions(item)}
               </div>
             )}
@@ -200,24 +200,24 @@ export default function DataTable<T extends { id: number | string }>({
 
       {/* Pagination Footer */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="bg-gray-50/50 dark:bg-gray-900/20 px-6 py-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-700/50 backdrop-blur-sm">
+        <div className="bg-gray-50/50 dark:bg-gray-900/20 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               {pagination.totalItems ? (
-                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                  Total: <span className="text-blue-600 dark:text-blue-400">{pagination.totalItems}</span> registros
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Total: <span className="font-semibold text-gray-700 dark:text-gray-200">{pagination.totalItems}</span> registros
                 </p>
               ) : (
-                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Página {pagination.currentPage} / {pagination.totalPages}
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <button
                 onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
                 disabled={pagination.currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-bold bg-white dark:bg-gray-800 disabled:opacity-30 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 disabled:opacity-30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Anterior
               </button>
@@ -233,9 +233,9 @@ export default function DataTable<T extends { id: number | string }>({
                     key={pageNum}
                     onClick={() => pagination.onPageChange(pageNum)}
                     className={clsx(
-                      "w-9 h-9 rounded-lg text-xs font-bold transition-all duration-200",
+                      "w-8 h-8 rounded-lg text-xs font-medium transition-colors",
                       pagination.currentPage === pageNum
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                        ? "bg-blue-600 text-white"
                         : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400"
                     )}
                   >
@@ -246,7 +246,7 @@ export default function DataTable<T extends { id: number | string }>({
               <button
                 onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
                 disabled={pagination.currentPage === pagination.totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-bold bg-white dark:bg-gray-800 disabled:opacity-30 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 disabled:opacity-30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Siguiente
               </button>
@@ -261,7 +261,7 @@ export default function DataTable<T extends { id: number | string }>({
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Pág. {pagination.currentPage} / {pagination.totalPages}</span>
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Pág. {pagination.currentPage} / {pagination.totalPages}</span>
             <button
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
               disabled={pagination.currentPage === pagination.totalPages}

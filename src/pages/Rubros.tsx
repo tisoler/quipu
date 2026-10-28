@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
 import api from '../lib/api'
 import DataTable from '../components/DataTable'
+import PageHeader from '../components/PageHeader'
+import Modal from '../components/Modal'
 
 interface Rubro {
     id: number
@@ -73,15 +76,16 @@ export default function Rubros() {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Rubros</h1>
-                <button
-                    onClick={handleNew}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                    Agregar Rubro
-                </button>
-            </div>
+            <PageHeader
+                title="Rubros"
+                description="Categorías para organizar productos y materiales."
+                actions={
+                    <button onClick={handleNew} className="btn-primary">
+                        <Plus size={16} strokeWidth={2} />
+                        Agregar Rubro
+                    </button>
+                }
+            />
 
             <div className="mb-6">
                 <DataTable
@@ -122,55 +126,43 @@ function RubroModal({
     isLoading: boolean
 }) {
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-                <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                    {rubro ? 'Editar Rubro' : 'Nuevo Rubro'}
-                </h2>
-                <form onSubmit={onSubmit}>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Nombre *
-                            </label>
-                            <input
-                                type="text"
-                                name="nombre"
-                                required
-                                defaultValue={rubro?.nombre || ''}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Descripción
-                            </label>
-                            <textarea
-                                name="descripcion"
-                                defaultValue={rubro?.descripcion || ''}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                rows={3}
-                            />
-                        </div>
-                    </div>
-                    <div className="mt-6 flex justify-end space-x-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {isLoading ? 'Guardando...' : 'Guardar'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <Modal
+            title={rubro ? 'Editar Rubro' : 'Nuevo Rubro'}
+            onClose={onClose}
+            size="md"
+            footer={
+                <>
+                    <button type="button" onClick={onClose} className="btn-secondary">
+                        Cancelar
+                    </button>
+                    <button type="submit" form="rubro-form" disabled={isLoading} className="btn-primary">
+                        {isLoading ? 'Guardando...' : 'Guardar'}
+                    </button>
+                </>
+            }
+        >
+            <form id="rubro-form" onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="form-label">Nombre *</label>
+                    <input
+                        type="text"
+                        name="nombre"
+                        required
+                        autoFocus
+                        defaultValue={rubro?.nombre || ''}
+                        className="form-input"
+                    />
+                </div>
+                <div>
+                    <label className="form-label">Descripción</label>
+                    <input
+                        type="text"
+                        name="descripcion"
+                        defaultValue={rubro?.descripcion || ''}
+                        className="form-input"
+                    />
+                </div>
+            </form>
+        </Modal>
     )
 }

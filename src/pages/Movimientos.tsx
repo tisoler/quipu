@@ -5,6 +5,8 @@ import api from '../lib/api'
 import { TipoMovimiento, TipoArticulo, EstadoMovimiento } from '../types'
 import MovimientoModal from '../components/MovimientoModal'
 import DataTable, { Column } from '../components/DataTable'
+import PageHeader from '../components/PageHeader'
+import { Plus } from 'lucide-react'
 import clsx from 'clsx'
 
 interface Movimiento {
@@ -201,20 +203,17 @@ export default function Movimientos({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/40 p-4 mb-2 rounded-2xl md:bg-transparent md:p-0">
-        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{title}</h1>
-        {canAdd && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="group px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center gap-2"
-          >
-            <span className="bg-white/20 p-1 rounded-lg group-hover:scale-110 transition-transform">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-            </span>
-            Agregar {fixedTipoMovimiento ? fixedTipoMovimiento.charAt(0).toUpperCase() + fixedTipoMovimiento.slice(1) : 'Movimiento'}
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title={title}
+        actions={
+          canAdd ? (
+            <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+              <Plus size={16} strokeWidth={2} />
+              Agregar {fixedTipoMovimiento ? fixedTipoMovimiento.charAt(0).toUpperCase() + fixedTipoMovimiento.slice(1) : 'Movimiento'}
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Filtros */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 space-y-6 ring-1 ring-black/[0.03] dark:ring-white/[0.03]">

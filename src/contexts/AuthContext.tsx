@@ -13,6 +13,7 @@ interface User {
   nombreUsuario: string
   idEmpresa: number
   nombreEmpresa: string
+  condicionIvaEmpresa?: string | null
   roles: string[]
   permisos: string[]
 }

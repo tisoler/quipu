@@ -4,7 +4,9 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'media', // Usa la preferencia del navegador
+  // 'class' permite alternar light/dark manualmente; por defecto sigue al navegador
+  // (ver contexts/ThemeContext.tsx y el script anti-flash en index.html)
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

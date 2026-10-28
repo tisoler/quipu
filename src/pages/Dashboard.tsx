@@ -1,8 +1,13 @@
+import PageHeader from '../components/PageHeader'
+
 export default function Dashboard() {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Dashboard</h1>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <PageHeader
+        title="Dashboard"
+        description="Resumen general de tu inventario."
+      />
+      <div className="card p-6">
         <p className="text-gray-600 dark:text-gray-400">
           Bienvenido al dashboard. El contenido se agregará próximamente.
         </p>
