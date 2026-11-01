@@ -14,6 +14,7 @@ interface User {
   idEmpresa: number
   nombreEmpresa: string
   condicionIvaEmpresa?: string | null
+  arcaEntorno?: string | null
   roles: string[]
   permisos: string[]
 }

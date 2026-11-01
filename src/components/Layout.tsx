@@ -19,6 +19,7 @@ import {
   Users,
   Receipt,
   Settings,
+  FlaskConical,
   LogOut,
   Menu,
   X,
@@ -114,6 +115,7 @@ export default function Layout() {
   const isActive = (path: string) => location.pathname === path
   const esAdminCajas = (user?.permisos || []).includes('lectura:caja-central')
   const puedeConfigurar = (user?.permisos || []).includes('lectura:configuracion')
+  const esHomologacion = user?.arcaEntorno === 'homologacion'
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -297,6 +299,14 @@ export default function Layout() {
         <div className={clsx('flex-1 transition-[padding] duration-200', colapsado ? 'xl:pl-20' : 'xl:pl-64')}>
           <main className="py-6">
             <div className="max-w-[90rem] mx-auto px-4 sm:px-6 xl:px-8">
+              {esHomologacion && (
+                <div className="flex justify-end mb-3">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-orange-500 text-white shadow-md">
+                    <FlaskConical size={14} strokeWidth={2.2} />
+                    Ambiente de pruebas
+                  </span>
+                </div>
+              )}
               {loading ? <Loading /> : <Outlet />}
             </div>
           </main>
