@@ -193,7 +193,10 @@ export default function Layout() {
       <div className="flex">
         {/* Desktop sidebar */}
         <aside className={clsx(
-          'hidden xl:flex xl:flex-col xl:fixed xl:inset-y-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-[width] duration-200',
+          'hidden xl:flex xl:flex-col xl:fixed xl:inset-y-0 bg-white dark:bg-gray-800 transition-[width] duration-200',
+          esHomologacion
+            ? 'border-r-[3px] border-orange-500'
+            : 'border-r border-gray-200 dark:border-gray-700',
           colapsado ? 'xl:w-20' : 'xl:w-64',
         )}>
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
@@ -297,16 +300,16 @@ export default function Layout() {
 
         {/* Main content */}
         <div className={clsx('flex-1 transition-[padding] duration-200', colapsado ? 'xl:pl-20' : 'xl:pl-64')}>
+          {esHomologacion && (
+            <div className="sticky top-[57px] xl:top-0 z-30 h-[30px] flex items-center justify-center bg-orange-500 shadow-md">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-white text-orange-600 shadow">
+                <FlaskConical size={13} strokeWidth={2.2} />
+                Ambiente de pruebas
+              </span>
+            </div>
+          )}
           <main className="py-6">
             <div className="max-w-[90rem] mx-auto px-4 sm:px-6 xl:px-8">
-              {esHomologacion && (
-                <div className="flex justify-end mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-orange-500 text-white shadow-md">
-                    <FlaskConical size={14} strokeWidth={2.2} />
-                    Ambiente de pruebas
-                  </span>
-                </div>
-              )}
               {loading ? <Loading /> : <Outlet />}
             </div>
           </main>
