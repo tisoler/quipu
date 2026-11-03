@@ -158,6 +158,9 @@ export interface Comprobante {
   mensajeError?: string | null
   createdAt: string
   snapshot?: {
+    empresa?: {
+      cuit: string
+    }
     detalle?: {
       netoGravado: number
       impIVA: number

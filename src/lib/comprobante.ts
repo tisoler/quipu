@@ -34,6 +34,39 @@ async function mensajeErrorPdf(e: any): Promise<string> {
   return 'No se pudo generar el PDF'
 }
 
+/** Nombre de archivo estilo ARCA: CUIT_TIPO03_PTO05_NRO08.pdf */
+export function nombreArchivoArca(
+  cuit: string | null | undefined,
+  tipoComprobante: number,
+  puntoVenta: number,
+  nroComprobante: number,
+): string {
+  const c = (cuit || '').replace(/\D/g, '');
+  if (!c) return `comprobante_${puntoVenta}_${nroComprobante}.pdf`;
+  const p2 = (n: number, l: number) => String(n).padStart(l, '0');
+  return `${c.padStart(11, '0')}_${p2(tipoComprobante, 3)}_${p2(puntoVenta, 5)}_${p2(nroComprobante, 8)}.pdf`;
+}
+
+/** Descarga el PDF con el nombre de archivo ARCA. */
+export async function descargarPdfVenta(opts: {
+  idVenta: number
+  copia?: CopiaComprobante
+  cuit?: string | null
+  tipoComprobante: number
+  puntoVenta: number
+  nroComprobante: number
+}): Promise<void> {
+  const blob = await obtenerPdfVentaBlob(opts.idVenta, opts.copia ?? 'original');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivoArca(opts.cuit, opts.tipoComprobante, opts.puntoVenta, opts.nroComprobante);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 /** Letra del comprobante a partir de su código AFIP (1=A, 6=B, 11=C). */
 export function letraComprobante(tipoComprobante: number): string {
   if (tipoComprobante === 1) return 'A'
