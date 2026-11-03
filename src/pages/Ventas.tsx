@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText, Receipt, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { FileText, Receipt, Loader2, CheckCircle2, XCircle, AlertTriangle, Download } from 'lucide-react'
 import api from '../lib/api'
-import { abrirPdfVenta } from '../lib/comprobante'
+import { abrirPdfVenta, descargarPdfVenta } from '../lib/comprobante'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import FacturarVentaModal from '../components/FacturarVentaModal'
@@ -34,6 +34,26 @@ export default function Ventas() {
       await abrirPdfVenta(id, copia as 'original' | 'duplicado' | 'triplicado')
     } catch (e: any) {
       alert(e?.message || 'No se pudo generar el PDF')
+    } finally {
+      setGenerando(null)
+    }
+  }
+
+  const descargar = async (v: VentaListado) => {
+    const comp = v.comprobante
+    if (!comp) return
+    setGenerando(`${v.id}-descarga`)
+    try {
+      await descargarPdfVenta({
+        idVenta: v.id,
+        copia: 'original',
+        cuit: comp.snapshot?.empresa?.cuit,
+        tipoComprobante: comp.tipoComprobante,
+        puntoVenta: comp.puntoVenta,
+        nroComprobante: comp.nroComprobante,
+      })
+    } catch (e: any) {
+      alert(e?.message || 'No se pudo descargar el PDF')
     } finally {
       setGenerando(null)
     }
@@ -112,6 +132,15 @@ export default function Ventas() {
                   className="px-2.5 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                 >
                   Triplicado
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); void descargar(v) }}
+                  disabled={generando === `${v.id}-descarga`}
+                  title="Descargar PDF"
+                  aria-label="Descargar PDF"
+                  className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 inline-flex items-center"
+                >
+                  {generando === `${v.id}-descarga` ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                 </button>
                 <BotonWhatsappVenta ventaId={v.id} />
               </div>

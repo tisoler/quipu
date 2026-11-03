@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Building2, Store, ShieldCheck, Loader2, Plus, Trash2, Pencil, Plug, Upload } from 'lucide-react'
+import { Building2, Store, ShieldCheck, Loader2, Plus, Trash2, Pencil, Plug, Upload, CheckCircle2, XCircle } from 'lucide-react'
 import api from '../lib/api'
 import PageHeader from '../components/PageHeader'
 import Modal from '../components/Modal'
@@ -160,6 +160,10 @@ function PuntosVenta({ puntos, loading, onChanged }: { puntos: PuntoVenta[]; loa
   const [modal, setModal] = useState(false)
   const [editar, setEditar] = useState<PuntoVenta | null>(null)
   const [error, setError] = useState('')
+  const [entornoVerif, setEntornoVerif] = useState<'homologacion' | 'produccion'>('produccion')
+  const [verificando, setVerificando] = useState(false)
+  const [habilitados, setHabilitados] = useState<number[] | null>(null)
+  const [entornoVerificado, setEntornoVerificado] = useState<string | null>(null)
 
   const save = useMutation({
     mutationFn: async (data: Partial<PuntoVenta>) => {
@@ -176,6 +180,22 @@ function PuntosVenta({ puntos, loading, onChanged }: { puntos: PuntoVenta[]; loa
     onError: (e) => setError(errorMessage(e)),
   })
 
+  const verificar = async () => {
+    setVerificando(true)
+    setError('')
+    try {
+      const res = await api.get('/configuracion/arca/puntos-venta-habilitados', { params: { entorno: entornoVerif } })
+      setHabilitados(res.data.habilitados || [])
+      setEntornoVerificado(res.data.entorno)
+    } catch (e: any) {
+      setError(errorMessage(e))
+      setHabilitados(null)
+      setEntornoVerificado(null)
+    } finally {
+      setVerificando(false)
+    }
+  }
+
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-4">
@@ -183,9 +203,32 @@ function PuntosVenta({ puntos, loading, onChanged }: { puntos: PuntoVenta[]; loa
           <Store size={18} strokeWidth={1.8} className="text-blue-600 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Puntos de venta</h2>
         </div>
-        <button onClick={() => { setEditar(null); setModal(true) }} className="btn-secondary">
-          <Plus size={16} strokeWidth={2} /> Agregar
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setEditar(null); setModal(true) }} className="btn-secondary">
+            <Plus size={16} strokeWidth={2} /> Agregar
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3 py-2.5">
+        <ShieldCheck size={15} strokeWidth={1.8} className="text-gray-400 dark:text-gray-500 shrink-0" />
+        <span className="text-xs text-gray-500 dark:text-gray-400">Verificar habilitación en ARCA:</span>
+        <select
+          value={entornoVerif}
+          onChange={(e) => setEntornoVerif(e.target.value as 'homologacion' | 'produccion')}
+          className="form-input !w-auto !py-1.5 text-sm"
+        >
+          <option value="produccion">Producción</option>
+          <option value="homologacion">Homologación</option>
+        </select>
+        <button onClick={() => void verificar()} disabled={verificando} className="btn-secondary !py-1.5 text-sm">
+          {verificando ? <Loader2 size={14} className="animate-spin" /> : 'Verificar'}
         </button>
+        {entornoVerificado && (
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            Consultado en {entornoVerificado === 'produccion' ? 'producción' : 'homologación'}
+          </span>
+        )}
       </div>
 
       {loading ? (
@@ -202,6 +245,17 @@ function PuntosVenta({ puntos, loading, onChanged }: { puntos: PuntoVenta[]; loa
               <span className="flex-1 text-sm text-gray-500 dark:text-gray-400">{p.descripcion || ''}</span>
               {p.predeterminado && (
                 <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Predeterminado</span>
+              )}
+              {habilitados !== null && (
+                habilitados.includes(p.numero) ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <CheckCircle2 size={12} /> Habilitado en ARCA
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    <XCircle size={12} /> No habilitado en ARCA
+                  </span>
+                )
               )}
               <button onClick={() => { setEditar(p); setModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"><Pencil size={15} /></button>
               <button onClick={() => eliminar.mutate(p.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 dark:hover:text-red-400"><Trash2 size={15} /></button>
