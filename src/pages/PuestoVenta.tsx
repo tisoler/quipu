@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Search,
@@ -10,17 +10,23 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  History,
   CreditCard,
   Landmark,
   Banknote,
   QrCode,
   NotebookText,
+  Eye,
   type LucideIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 import Modal from '../components/Modal'
 import Loading from '../components/Loading'
+import DataTable from '../components/DataTable'
+import PageHeader from '../components/PageHeader'
 import DesglosePagos from '../components/DesglosePagos'
 import FacturarVentaModal from '../components/FacturarVentaModal'
 import { useAuth } from '../contexts/AuthContext'
@@ -45,7 +51,7 @@ const errorMessage = (error: unknown) =>
 
 // Replica visual del desglose fiscal del backend (solo informativo;
 // los importes oficiales los calcula el servidor al emitir).
-function desgloseLinea(producto: ProductoPuesto, cantidad: number) {
+function desgloseLinea(producto: Pick<ProductoPuesto, 'precio' | 'precioConIva' | 'alicuotaIva'>, cantidad: number) {
   const base = cantidad * producto.precio
   const alicuota = Number(producto.alicuotaIva ?? 21)
   if (producto.precioConIva && alicuota > 0) {
@@ -235,6 +241,8 @@ function CajaAbierta({
   const [modalCerrar, setModalCerrar] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [ventaParaFacturar, setVentaParaFacturar] = useState<{ id: number; total: number } | null>(null)
+  const [paso, setPaso] = useState<'venta' | 'pago'>('venta')
+  const [vista, setVista] = useState<'venta' | 'registradas'>('venta')
   const { permisos, user } = useAuth()
   const esRI = (user?.condicionIvaEmpresa || '').includes('Responsable Inscripto')
 
@@ -263,13 +271,23 @@ function CajaAbierta({
     )
   }
 
+  const fijarCantidad = (idProducto: number, cantidad: number) => {
+    setCarrito(prev =>
+      prev.map(i => i.producto.id === idProducto ? { ...i, cantidad } : i),
+    )
+  }
+
+  const quitarLinea = (idProducto: number) => {
+    setCarrito(prev => prev.filter(i => i.producto.id !== idProducto))
+  }
+
   const totalCarrito = carrito.reduce((acc, i) => acc + i.cantidad * i.producto.precio, 0)
   const desglose = desglosarCarrito(carrito)
 
   return (
     <div>
       {/* Barra superior de la caja */}
-      <div className="card px-6 py-5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="card px-6 py-4 mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 flex items-center justify-center">
             <Store size={20} strokeWidth={1.8} />
@@ -287,6 +305,19 @@ function CajaAbierta({
             <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">Vendido hoy</p>
             <p className="text-lg font-bold text-gray-900 dark:text-white font-mono tabular-nums">{fmt(totalVendido)}</p>
           </div>
+          <button onClick={() => setVista(vista === 'venta' ? 'registradas' : 'venta')} className="btn-secondary">
+            {vista === 'venta' ? (
+              <>
+                <History size={16} strokeWidth={2} />
+                Ventas del día
+              </>
+            ) : (
+              <>
+                <Store size={16} strokeWidth={2} />
+                Volver a la venta
+              </>
+            )}
+          </button>
           <button onClick={() => setModalCerrar(true)} className="btn-secondary">
             <LockKeyhole size={16} strokeWidth={2} />
             Cerrar caja
@@ -294,113 +325,164 @@ function CajaAbierta({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 items-start gap-3">
-        {/* Búsqueda de productos */}
-        <Buscador idCaja={caja.id} onAgregar={agregar} />
+      {vista === 'venta' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 xl:h-[calc(100vh-143px)]">
+          {/* Izquierda: productos */}
+          <Buscador idCaja={caja.id} onAgregar={agregar} bloqueado={paso === 'pago'} />
 
-        {/* Venta en curso y ventas del día */}
-        <div className="space-y-3">
-          <div className="card p-6">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Venta en curso</h2>
+          {/* Derecha: venta en curso ocupa todo el alto */}
+          <div className="flex flex-col min-h-0 xl:h-full">
+            <div className="card p-6 flex flex-col min-h-0 xl:flex-1">
+              {paso === 'pago' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPaso('venta')}
+                    className="btn-secondary self-start mb-4"
+                  >
+                    <ArrowLeft size={16} strokeWidth={2} />
+                    Volver a la venta
+                  </button>
+                  <div className="rounded-lg bg-blue-50/70 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-4 py-3 mb-4 shrink-0">
+                    <p className="text-xs uppercase tracking-wide text-blue-500/80 dark:text-blue-400/80">Total a cobrar</p>
+                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 font-mono tabular-nums">
+                      {fmt(esRI ? desglose.total : totalCarrito)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      {carrito.reduce((a, i) => a + i.cantidad, 0)} ítems
+                    </p>
+                  </div>
+                  <ToggleTipoPago valor={tipoPago} onChange={setTipoPago} />
+                  <div className="mt-auto shrink-0">
+                    <RegistrarVenta
+                      idCaja={caja.id}
+                      items={carrito}
+                      tipoPago={tipoPago}
+                      onRegistrado={(venta) => {
+                        setCarrito([])
+                        setTipoPago(null)
+                        setPaso('venta')
+                        setFeedback('Venta registrada')
+                        onRefresh()
+                        if (permisos.includes('escritura:facturacion')) {
+                          setVentaParaFacturar(venta)
+                        }
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Venta en curso</h2>
 
-            {carrito.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500 py-6 text-center">
-                Buscá un producto y agregalo acá.
-              </p>
-            ) : (
-              <ul className="space-y-3 mb-4">
-                {carrito.map(item => {
-                  const d = esRI ? desgloseLinea(item.producto, item.cantidad) : null
-                  return (
-                  <li key={item.producto.id} className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{item.producto.nombre}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">
-                        {fmt(item.producto.precio)} × {item.cantidad}
-                        {d && (
-                          <span> · IVA {d.alicuota}% ({fmt(d.iva)})</span>
-                        )}
-                      </p>
+                  {carrito.length === 0 ? (
+                    <p className="text-sm text-gray-400 dark:text-gray-500 py-6 text-center">
+                      Buscá un producto y agregalo acá.
+                    </p>
+                  ) : (
+                    <ul className="space-y-3 mb-4 xl:mb-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pb-4">
+                      {carrito.map(item => {
+                        const d = esRI ? desgloseLinea(item.producto, item.cantidad) : null
+                        return (
+                          <li key={item.producto.id} className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{item.producto.nombre}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">
+                                {fmt(item.producto.precio)} × {item.cantidad}
+                                {d && (
+                                  <span> · IVA {d.alicuota}% ({fmt(d.iva)})</span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <BotonCantidad onClick={() => cambiarCantidad(item.producto.id, -1)} aria="Quitar uno">
+                                <Minus size={18} />
+                              </BotonCantidad>
+                              <CantidadInput
+                                value={item.cantidad}
+                                max={item.producto.stockPuesto}
+                                onChange={(n) => fijarCantidad(item.producto.id, n)}
+                              />
+                              <BotonCantidad
+                                onClick={() => cambiarCantidad(item.producto.id, 1)}
+                                disabled={item.cantidad >= item.producto.stockPuesto}
+                                aria="Sumar uno"
+                              >
+                                <Plus size={18} />
+                              </BotonCantidad>
+                            </div>
+                            {d ? (
+                              <div className="w-24 text-right shrink-0">
+                                <p className="text-[11px] font-mono tabular-nums text-gray-400 dark:text-gray-500">{fmt(d.neto)}</p>
+                                <p className="text-sm font-mono tabular-nums font-medium text-gray-700 dark:text-gray-200">{fmt(d.total)}</p>
+                              </div>
+                            ) : (
+                              <span className="w-20 text-right text-sm font-mono tabular-nums text-gray-700 dark:text-gray-200">
+                                {fmt(item.cantidad * item.producto.precio)}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => quitarLinea(item.producto.id)}
+                              title="Quitar línea"
+                              aria-label="Quitar línea"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors shrink-0"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-auto shrink-0">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Total</span>
+                      <span className="text-xl font-bold text-gray-900 dark:text-white font-mono tabular-nums">{fmt(totalCarrito)}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <BotonCantidad onClick={() => cambiarCantidad(item.producto.id, -1)} aria="Quitar uno">
-                        <Minus size={18} />
-                      </BotonCantidad>
-                      <span className="w-8 text-center text-base font-semibold text-gray-800 dark:text-gray-100 tabular-nums">
-                        {item.cantidad}
-                      </span>
-                      <BotonCantidad
-                        onClick={() => cambiarCantidad(item.producto.id, 1)}
-                        disabled={item.cantidad >= item.producto.stockPuesto}
-                        aria="Sumar uno"
-                      >
-                        <Plus size={18} />
-                      </BotonCantidad>
-                    </div>
-                    {d ? (
-                      <div className="w-24 text-right shrink-0">
-                        <p className="text-[11px] font-mono tabular-nums text-gray-400 dark:text-gray-500">{fmt(d.neto)}</p>
-                        <p className="text-sm font-mono tabular-nums font-medium text-gray-700 dark:text-gray-200">{fmt(d.total)}</p>
+                    {esRI && carrito.length > 0 && (
+                      <div className="mb-4 space-y-1 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
+                          <span className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(desglose.neto)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 dark:text-gray-400">IVA</span>
+                          <span className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(desglose.iva)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 dark:text-gray-400">Total c/IVA (factura)</span>
+                          <span className="font-mono tabular-nums font-semibold text-gray-900 dark:text-white">{fmt(desglose.total)}</span>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="w-20 text-right text-sm font-mono tabular-nums text-gray-700 dark:text-gray-200">
-                        {fmt(item.cantidad * item.producto.precio)}
-                      </span>
                     )}
-                  </li>
-                  )
-                })}
-              </ul>
-            )}
+                    <button
+                      type="button"
+                      onClick={() => setPaso('pago')}
+                      disabled={carrito.length === 0}
+                      className="btn-primary w-full mt-4"
+                    >
+                      Seleccionar modo de cobro
+                      <ArrowRight size={16} strokeWidth={2} />
+                    </button>
+                  </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Total</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white font-mono tabular-nums">{fmt(totalCarrito)}</span>
-              </div>
-              {esRI && carrito.length > 0 && (
-                <div className="mb-4 space-y-1 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
-                    <span className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(desglose.neto)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">IVA</span>
-                    <span className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(desglose.iva)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Total c/IVA (factura)</span>
-                    <span className="font-mono tabular-nums font-semibold text-gray-900 dark:text-white">{fmt(desglose.total)}</span>
-                  </div>
-                </div>
+                  {feedback && (
+                    <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle2 size={15} /> {feedback}
+                    </p>
+                  )}
+                </>
               )}
-              <ToggleTipoPago valor={tipoPago} onChange={setTipoPago} />
-              <RegistrarVenta
-                idCaja={caja.id}
-                items={carrito}
-                tipoPago={tipoPago}
-                onRegistrado={(venta) => {
-                  setCarrito([])
-                  setTipoPago(null)
-                  setFeedback('Venta registrada')
-                  onRefresh()
-                  if (permisos.includes('escritura:facturacion')) {
-                    setVentaParaFacturar(venta)
-                  }
-                }}
-              />
             </div>
 
-            {feedback && (
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-green-600 dark:text-green-400">
-                <CheckCircle2 size={15} /> {feedback}
-              </p>
-            )}
           </div>
-
-          <VentasDelDia ventas={ventas} onRefresh={onRefresh} />
         </div>
-      </div>
+
+      ) : (
+        <VentasDelDia ventas={ventas} />
+      )}
 
       {modalCerrar && (
         <CerrarCajaModal
@@ -442,6 +524,44 @@ function BotonCantidad({ children, onClick, disabled, aria }: {
     >
       {children}
     </button>
+  )
+}
+
+/* Input de cantidad sin spinners ni cambio con scroll: texto + inputMode numérico */
+function CantidadInput({ value, max, onChange }: {
+  value: number
+  max: number
+  onChange: (n: number) => void
+}) {
+  const [texto, setTexto] = useState<string | null>(null)
+
+  useEffect(() => {
+    setTexto(null)
+  }, [value])
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      aria-label="Cantidad"
+      value={texto ?? String(value)}
+      onChange={(e) => {
+        const digitos = e.target.value.replace(/\D/g, '')
+        if (digitos === '') {
+          setTexto('')
+          return
+        }
+        setTexto(digitos)
+        const n = parseInt(digitos, 10)
+        if (!isNaN(n)) onChange(Math.min(Math.max(n, 1), Math.max(max, 1)))
+      }}
+      onBlur={() => setTexto(null)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+      }}
+      className="w-12 h-9 text-center text-base font-semibold text-gray-800 dark:text-gray-100 tabular-nums rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+    />
   )
 }
 
@@ -490,7 +610,7 @@ function ToggleTipoPago({ valor, onChange }: { valor: TipoPago | null; onChange:
 
 /* ---------- Buscador de productos con stock ---------- */
 
-function Buscador({ idCaja, onAgregar }: { idCaja: number; onAgregar: (p: ProductoPuesto) => void }) {
+function Buscador({ idCaja, onAgregar, bloqueado }: { idCaja: number; onAgregar: (p: ProductoPuesto) => void; bloqueado?: boolean }) {
   const [texto, setTexto] = useState('')
   const [debounced, setDebounced] = useState('')
 
@@ -508,26 +628,38 @@ function Buscador({ idCaja, onAgregar }: { idCaja: number; onAgregar: (p: Produc
   })
 
   return (
-    <div className="card p-6">
-      <div className="relative mb-4">
+    <div className={clsx('card p-6 flex flex-col min-h-0 xl:flex-1', bloqueado && 'opacity-60 saturate-50')}>
+      <div className="relative mb-4 shrink-0">
         <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           autoFocus
           value={texto}
+          disabled={bloqueado}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Buscar por nombre, código, talle o presentación..."
           className="form-input pl-10"
         />
-        {isFetching && <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
+        {isFetching && (
+          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 flex">
+            <Loader2 size={16} className="animate-spin" />
+          </span>
+        )}
       </div>
+
+      {bloqueado && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-700/60 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+          <LockKeyhole size={14} className="shrink-0" />
+          Agregado pausado: elegí el modo de cobro o volvé a la venta
+        </div>
+      )}
 
       {productos.length === 0 ? (
         <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
           No se encontraron productos.
         </p>
       ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[420px] overflow-y-auto -mx-2">
+        <ul className="divide-y divide-gray-100 dark:divide-gray-700/50 overflow-y-auto -mx-2 pb-4 flex-1 min-h-0 max-h-[calc(100vh-245px)] xl:max-h-none">
           {productos.map(p => {
             const sinStock = p.stockPuesto <= 0
             return (
@@ -535,10 +667,10 @@ function Buscador({ idCaja, onAgregar }: { idCaja: number; onAgregar: (p: Produc
                 <button
                   type="button"
                   onClick={() => onAgregar(p)}
-                  disabled={sinStock}
+                  disabled={sinStock || bloqueado}
                   className={clsx(
                     'w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-left transition-colors',
-                    sinStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50/60 dark:hover:bg-blue-400/5',
+                    (sinStock || bloqueado) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50/60 dark:hover:bg-blue-400/5',
                   )}
                 >
                   <div className="flex-1 min-w-0">
@@ -612,67 +744,200 @@ function RegistrarVenta({ idCaja, items, tipoPago, onRegistrado }: {
 
 /* ---------- Ventas del día ---------- */
 
-function VentasDelDia({ ventas, onRefresh }: { ventas: VentaCaja[]; onRefresh: () => void }) {
-  const [error, setError] = useState('')
+interface GrupoVenta {
+  id: string
+  idVenta: number | null
+  fecha: string
+  tipoPago?: TipoPago | null
+  items: VentaCaja[]
+}
 
-  const anularMutation = useMutation({
-    mutationFn: async (idMovimiento: number) => (await api.delete(`/puestos/ventas/${idMovimiento}`)).data,
-    onSuccess: () => {
-      setError('')
-      onRefresh()
-    },
-    onError: (err) => setError(errorMessage(err)),
-  })
+function VentasDelDia({ ventas }: { ventas: VentaCaja[] }) {
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+
+  const grupos = useMemo<GrupoVenta[]>(() => {
+    const mapa = new Map<string, GrupoVenta>()
+    for (const v of ventas) {
+      const id = v.idVenta != null ? `v-${v.idVenta}` : `m-${v.id}`
+      const g = mapa.get(id)
+      if (g) {
+        g.items.push(v)
+        if (v.fecha > g.fecha) g.fecha = v.fecha
+      } else {
+        mapa.set(id, { id, idVenta: v.idVenta ?? null, fecha: v.fecha, tipoPago: v.tipoPago, items: [v] })
+      }
+    }
+    return [...mapa.values()].sort((a, b) => +new Date(b.fecha) - +new Date(a.fecha))
+  }, [ventas])
+
+  const totalDia = grupos.reduce(
+    (acc, g) => acc + g.items.reduce((a, v) => a + Math.abs(Number(v.total)), 0),
+    0,
+  )
+  const grupo = detalleId ? grupos.find(g => g.id === detalleId) ?? null : null
 
   return (
-    <div className="card p-6">
-      <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-        Ventas registradas ({ventas.length})
-      </h2>
+    <div>
+      <PageHeader
+        title="Ventas del día"
+        description={grupos.length === 0 ? 'Todavía no hay ventas en esta caja.' : `${grupos.length} ventas · total ${fmt(totalDia)}`}
+      />
 
-      {ventas.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">Todavía no hay ventas en esta caja.</p>
-      ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[320px] overflow-y-auto">
-          {ventas.map(v => (
-            <li key={v.id} className="flex items-center gap-3 py-2.5">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{v.producto?.nombre || `Producto #${v.idProducto}`}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 flex-wrap">
-                  <span>{new Date(v.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span>·</span>
-                  <span>x {Math.abs(Number(v.cantidad))}</span>
-                  {v.tipoPago && (
-                    <>
-                      <span>·</span>
-                      <span title={ETIQUETAS_TIPO_PAGO[v.tipoPago]} className="inline-flex items-center gap-1">
-                        <IconoPago tipo={v.tipoPago} size={12} />
-                        {ETIQUETAS_TIPO_PAGO[v.tipoPago]}
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-              <span className="text-sm font-mono tabular-nums text-gray-700 dark:text-gray-200">
-                {fmt(Math.abs(Number(v.total)))}
-              </span>
-              <button
-                type="button"
-                onClick={() => anularMutation.mutate(v.id)}
-                title="Anular venta"
-                aria-label="Anular venta"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
-              >
-                <Trash2 size={15} />
-              </button>
-            </li>
-          ))}
-        </ul>
+      <div className="mb-6">
+        <DataTable
+          data={grupos}
+          emptyMessage="Todavía no hay ventas en esta caja."
+          onRowClick={(g: GrupoVenta) => setDetalleId(g.id)}
+          columns={[
+            {
+              header: 'Hora',
+              key: 'fecha',
+              render: (g: GrupoVenta) =>
+                new Date(g.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+            },
+            {
+              header: 'Detalle',
+              key: 'items',
+              wrap: true,
+              render: (g: GrupoVenta) => {
+                const activos = g.items.filter(v => v.estado === 'activo')
+                const primero = activos[0]
+                if (!primero) return '-'
+                const nombre = primero.producto?.nombre || `Producto #${primero.idProducto}`
+                const resto = activos.length - 1
+                return `${Math.abs(Number(primero.cantidad))} × ${nombre}${resto > 0 ? ` (+${resto} más)` : ''}`
+              },
+            },
+            {
+              header: 'Medio de pago',
+              key: 'tipoPago',
+              render: (g: GrupoVenta) => g.tipoPago ? (
+                <span title={ETIQUETAS_TIPO_PAGO[g.tipoPago]} className="inline-flex items-center gap-1">
+                  <IconoPago tipo={g.tipoPago} size={12} />
+                  {ETIQUETAS_TIPO_PAGO[g.tipoPago]}
+                </span>
+              ) : '-',
+            },
+            {
+              header: 'Total',
+              key: 'total',
+              className: 'text-right font-mono tabular-nums',
+              render: (g: GrupoVenta) => fmt(g.items.reduce((a, v) => a + Math.abs(Number(v.total)), 0)),
+            },
+          ]}
+          renderActions={(g: GrupoVenta) => (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setDetalleId(g.id) }}
+              title="Ver detalle"
+              aria-label="Ver detalle"
+              className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 inline-flex items-center"
+            >
+              <Eye size={12} />
+            </button>
+          )}
+        />
+      </div>
+
+      {grupo && (
+        <DetalleVentaCaja grupo={grupo} onClose={() => setDetalleId(null)} />
       )}
-      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }
+
+function DetalleVentaCaja({ grupo, onClose }: { grupo: GrupoVenta; onClose: () => void }) {
+  const activos = grupo.items.filter(v => v.estado === 'activo')
+  const anulados = grupo.items.length - activos.length
+  const lineas = activos.map(v => {
+    const cant = Math.abs(Number(v.cantidad))
+    const precio = Number(v.precio)
+    const d = desgloseLinea(
+      { precio, precioConIva: v.precioConIva, alicuotaIva: v.alicuotaIva },
+      cant,
+    )
+    return { v, cant, precio, ...d }
+  })
+  const neto = lineas.reduce((a, l) => a + l.neto, 0)
+  const iva = lineas.reduce((a, l) => a + l.iva, 0)
+  const total = lineas.reduce((a, l) => a + l.total, 0)
+  const registrado = activos.reduce((a, v) => a + Math.abs(Number(v.total)), 0)
+
+  return (
+    <Modal
+      title={grupo.idVenta != null ? `Venta #${grupo.idVenta}` : 'Venta'}
+      onClose={onClose}
+      size="2xl"
+    >
+      <div className="space-y-4">
+        <dl className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div>
+            <dt className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">Hora</dt>
+            <dd className="font-medium text-gray-900 dark:text-white">
+              {new Date(grupo.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">Medio de pago</dt>
+            <dd className="font-medium text-gray-900 dark:text-white">
+              {grupo.tipoPago ? ETIQUETAS_TIPO_PAGO[grupo.tipoPago] : '-'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">Ítems</dt>
+            <dd className="font-medium text-gray-900 dark:text-white">{activos.length}</dd>
+          </div>
+        </dl>
+
+        {activos.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">Sin ítems activos.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[300px] overflow-y-auto">
+            {lineas.map(l => (
+              <li key={l.v.id} className="py-2 flex items-start gap-3 text-sm">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-800 dark:text-gray-100 truncate">
+                    {l.v.producto?.nombre || `Producto #${l.v.idProducto}`}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">
+                    {l.cant} × {fmt(l.precio)} · IVA {l.alicuota}%
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[11px] font-mono tabular-nums text-gray-400 dark:text-gray-500">{fmt(l.neto)}</p>
+                  <p className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(l.total)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {anulados > 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">+{anulados} ítem(s) anulado(s) no incluidos.</p>
+        )}
+
+        <dl className="text-sm space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
+          <div className="flex justify-between gap-4">
+            <dt className="text-gray-500 dark:text-gray-400">Subtotal (neto)</dt>
+            <dd className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(neto)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-gray-500 dark:text-gray-400">IVA</dt>
+            <dd className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(iva)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-gray-500 dark:text-gray-400">Total c/IVA</dt>
+            <dd className="font-mono tabular-nums text-gray-700 dark:text-gray-200">{fmt(total)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-gray-500 dark:text-gray-400">Total registrado</dt>
+            <dd className="font-mono tabular-nums font-semibold text-gray-900 dark:text-white">{fmt(registrado)}</dd>
+          </div>
+        </dl>
+      </div>
+    </Modal>
+  )
+}
+
 
 /* ---------- Modal de cierre con arqueo ---------- */
 
