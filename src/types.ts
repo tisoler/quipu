@@ -98,6 +98,10 @@ export interface VentaCaja {
   precio: number
   total: number
   idProducto: number
+  idVenta: number | null
+  estado: EstadoMovimiento
+  precioConIva?: boolean
+  alicuotaIva?: number
   tipoPago?: TipoPago | null
   producto?: { id: number; nombre: string; codigo?: string; presentacion?: string }
 }

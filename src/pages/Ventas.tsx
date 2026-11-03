@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText, Receipt, Loader2, CheckCircle2, XCircle, AlertTriangle, Download } from 'lucide-react'
+import { FileText, Receipt, Loader2, CheckCircle2, XCircle, AlertTriangle, Download, Eye } from 'lucide-react'
 import api from '../lib/api'
 import { abrirPdfVenta, descargarPdfVenta } from '../lib/comprobante'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import FacturarVentaModal from '../components/FacturarVentaModal'
 import BotonWhatsappVenta from '../components/BotonWhatsappVenta'
+import DetalleVentaModal from '../components/DetalleVentaModal'
 import { useAuth } from '../contexts/AuthContext'
 import { VentaListado, ETIQUETAS_TIPO_PAGO, TipoPago } from '../types'
 
@@ -19,6 +20,7 @@ export default function Ventas() {
   const { permisos } = useAuth()
   const queryClient = useQueryClient()
   const [ventaFacturar, setVentaFacturar] = useState<VentaListado | null>(null)
+  const [detalleId, setDetalleId] = useState<number | null>(null)
   const [generando, setGenerando] = useState<string | null>(null)
 
   const puedeFacturar = permisos.includes('escritura:facturacion')
@@ -108,9 +110,20 @@ export default function Ventas() {
           },
         ]}
         renderActions={(v: VentaListado) => {
+          const detalle = (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDetalleId(v.id) }}
+              title="Ver detalle de la venta"
+              aria-label="Ver detalle de la venta"
+              className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 inline-flex items-center"
+            >
+              <Eye size={12} />
+            </button>
+          )
           if (v.comprobante?.estado === 'aprobado') {
             return (
               <div className="flex items-center gap-1">
+                {detalle}
                 <button
                   onClick={(e) => { e.stopPropagation(); abrirPdf(v.id, 'original') }}
                   disabled={generando === `${v.id}-original`}
@@ -148,18 +161,32 @@ export default function Ventas() {
           }
           if (!v.comprobante && puedeFacturar) {
             return (
-              <button
-                onClick={(e) => { e.stopPropagation(); setVentaFacturar(v) }}
-                className="px-2.5 py-1 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 inline-flex items-center gap-1"
-              >
-                <Receipt size={12} />
-                Facturar
-              </button>
+              <div className="flex items-center gap-1">
+                {detalle}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setVentaFacturar(v) }}
+                  className="px-2.5 py-1 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 inline-flex items-center gap-1"
+                >
+                  <Receipt size={12} />
+                  Facturar
+                </button>
+              </div>
+            )
+          }
+          if (!v.comprobante) {
+            return (
+              <div className="flex items-center gap-1">
+                {detalle}
+              </div>
             )
           }
           return null
         }}
       />
+
+      {detalleId !== null && (
+        <DetalleVentaModal ventaId={detalleId} onClose={() => setDetalleId(null)} />
+      )}
 
       {ventaFacturar && (
         <FacturarVentaModal
